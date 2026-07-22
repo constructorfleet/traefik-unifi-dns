@@ -3,4 +3,5 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 *.swp
+uv.lock
 secrets/
