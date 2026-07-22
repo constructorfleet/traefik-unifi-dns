@@ -1,31 +1,10 @@
 """Dashboard HTML rendering for the UniFi DNS Traefik controller."""
 
 from html import escape
+from pathlib import Path
 from string import Template
 
-DASHBOARD_TEMPLATE = Template("""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>UniFi DNS Traefik</title>
-  <style>
-    body{font:16px system-ui;max-width:800px;margin:3rem auto;color:#172033}
-    table{border-collapse:collapse;width:100%}
-    td,th{padding:.6rem;border-bottom:1px solid #d9dee8;text-align:left}
-    code{background:#f2f4f8;padding:.2rem}
-  </style>
-</head>
-<body>
-  <h1>UniFi DNS Traefik</h1>
-  <p>Conflicts: <code>$conflicts</code></p>
-  <p>Last error: <code>$error</code></p>
-  <h2>Owned records</h2>
-  <table>
-    <tr><th>Hostname</th><th>CNAME target</th></tr>
-    $rows
-  </table>
-</body>
-</html>""")
+DASHBOARD_TEMPLATE = Template((Path(__file__).parent / "templates" / "dashboard.html").read_text())
 
 
 def render_dashboard(ownership, conflicts, last_error):

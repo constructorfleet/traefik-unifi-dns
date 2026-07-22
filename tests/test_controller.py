@@ -1,6 +1,7 @@
 import unittest
 
-from app.controller import Controller, desired_records, extract_hosts, normalize_host
+from app.controller import Controller
+from app.traefik import desired_records, extract_hosts, normalize_host
 
 
 class RuleExtractionTests(unittest.TestCase):

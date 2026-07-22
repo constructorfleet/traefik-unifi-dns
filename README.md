@@ -15,12 +15,14 @@ through labels instead of hand-maintained DNS entries.
 
 The service is split by responsibility:
 
-- `app/controller.py`: pure reconciliation logic and Traefik label parsing.
+- `app/controller.py`: UniFi reconciliation orchestration.
+- `app/traefik.py`: Traefik label parsing and desired-record planning.
 - `app/docker_client.py`: Docker Engine API adapter. Supports Unix sockets and HTTP socket proxies.
 - `app/unifi_client.py`: UniFi Network static DNS API adapter.
 - `app/state_store.py`: persisted ownership state so the controller only deletes records it owns.
 - `app/runtime.py`: event/reconcile loop.
-- `app/dashboard.py`: HTML rendering for the status UI.
+- `app/dashboard.py`: status UI template rendering.
+- `app/templates/dashboard.html`: dashboard markup.
 - `app/web.py`: health, readiness, metrics, and dashboard HTTP routes.
 - `app/config.py`: environment parsing and validation.
 - `app/main.py`: composition root.

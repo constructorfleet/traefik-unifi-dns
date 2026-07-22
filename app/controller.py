@@ -2,57 +2,11 @@
 
 import json
 import logging
-import re
 import time
-from collections import defaultdict
+
+from .traefik import desired_records
 
 LOG = logging.getLogger(__name__)
-HOST_CALL = re.compile(r"(?<![A-Za-z])Host\(\s*((?:`[^`]+`\s*,?\s*)+)\)")
-LITERAL = re.compile(r"`([^`]+)`")
-
-
-def normalize_host(host):
-    return host.lower().rstrip(".")
-
-
-def extract_hosts(rule):
-    """Return only literal, non-wildcard Host() arguments from a Traefik rule."""
-    if not isinstance(rule, str):
-        return []
-    hosts = []
-    for match in HOST_CALL.finditer(rule):
-        values = LITERAL.findall(match.group(1))
-        if not values or any("*" in value for value in values):
-            continue
-        hosts.extend(normalize_host(value) for value in values)
-    return hosts
-
-
-def _allowed(host, zones):
-    return any(host == zone or host.endswith("." + zone) for zone in zones)
-
-
-def desired_records(
-    services, zones, default_target="docker-swarm", localdomain="local", with_conflicts=False
-):
-    """Produce desired hostname -> CNAME target, refusing ambiguous ownership."""
-    zones = [normalize_host(zone) for zone in zones]
-    claims = defaultdict(set)
-    for service in services:
-        labels = service.get("Spec", {}).get("Labels", {}) or {}
-        if labels.get("unifi-dns.enable", "").lower() != "true":
-            continue
-        target = labels.get("unifi-dns.target", default_target).strip().lower()
-        if not target or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", target):
-            continue
-        for key, rule in labels.items():
-            if key.startswith("traefik.http.routers.") and key.endswith(".rule"):
-                for host in extract_hosts(rule):
-                    if _allowed(host, zones):
-                        claims[host].add(target)
-    conflicts = {host for host, targets in claims.items() if len(targets) > 1}
-    desired = {host: next(iter(targets)) for host, targets in claims.items() if len(targets) == 1}
-    return (desired, conflicts) if with_conflicts else desired
 
 
 class Controller:
