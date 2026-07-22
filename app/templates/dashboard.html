@@ -43,7 +43,7 @@
     .dot.live{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.12)}
     .dot.error{background:#f04438;box-shadow:0 0 0 4px rgba(240,68,56,.12)}
     main.shell{display:grid;gap:18px}
-    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
     .card,.panel{
       background:var(--panel);
       border:1px solid var(--line);
@@ -65,6 +65,16 @@
     }
     .badge.warn{background:var(--warn-soft);color:var(--warn)}
     .grid{display:grid;grid-template-columns:1fr;gap:18px}
+    .tabs{display:flex;gap:8px;overflow:auto}
+    .tab{
+      width:auto;
+      min-height:34px;
+      border-color:var(--line);
+      background:#fff;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
     .filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;padding:16px}
     .field{display:grid;gap:6px}
     .field label{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
@@ -81,6 +91,7 @@
     button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
     button:hover{filter:brightness(.96)}
     .panel{overflow:hidden}
+    .table-panel[hidden]{display:none}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
     .panel-note{color:var(--muted);font-size:13px}
     .table-wrap{overflow:auto}
@@ -114,6 +125,8 @@
     <section class="cards" aria-label="Summary">
       <div class="card"><div class="label">Owned</div><div id="owned-count" class="value">0</div></div>
       <div class="card"><div class="label">Claims</div><div id="claims-count" class="value">0</div></div>
+      <div class="card"><div class="label">UniFi Target CNAMEs</div><div id="target-cname-count" class="value">0</div></div>
+      <div class="card"><div class="label">Stale Target CNAMEs</div><div id="stale-cname-count" class="value">0</div></div>
       <div class="card"><div class="label">Conflicts</div><div id="conflicts-count" class="value">0</div></div>
       <div class="card"><div class="label">Ignored</div><div id="ignored-count" class="value">0</div></div>
     </section>
@@ -152,20 +165,31 @@
         </table>
       </div>
     </section>
+    <nav class="tabs" aria-label="Record views">
+      <button class="tab active" type="button" data-tab="target-cnames-panel">UniFi Target CNAMEs</button>
+      <button class="tab" type="button" data-tab="owned-records-panel">Owned Records</button>
+      <button class="tab" type="button" data-tab="claims-panel">Source Claims</button>
+      <button class="tab" type="button" data-tab="ignored-panel">Ignored Labels</button>
+      <button class="tab" type="button" data-tab="conflicts-panel">Conflicts</button>
+    </nav>
     <section class="grid">
-      <section class="panel">
+      <section id="target-cnames-panel" class="panel table-panel">
+        <div class="panel-head"><h2>UniFi Target CNAMEs</h2><span class="panel-note">CNAMEs pointing at active DNS targets; stale rows are not in the current plan</span></div>
+        <div id="target-cnames" class="table-wrap"></div>
+      </section>
+      <section id="owned-records-panel" class="panel table-panel" hidden>
         <div class="panel-head"><h2>Owned Records</h2><span class="panel-note">Controller-owned UniFi CNAMEs</span></div>
         <div id="owned-records" class="table-wrap"></div>
       </section>
-      <section class="panel">
+      <section id="claims-panel" class="panel table-panel" hidden>
         <div class="panel-head"><h2>Source Claims</h2><span class="panel-note">Active host claims from labels</span></div>
         <div id="claims" class="table-wrap"></div>
       </section>
-      <section class="panel">
+      <section id="ignored-panel" class="panel table-panel" hidden>
         <div class="panel-head"><h2>Ignored Labels</h2><span class="panel-note">Rejected sources and reasons</span></div>
         <div id="ignored" class="table-wrap"></div>
       </section>
-      <section class="panel">
+      <section id="conflicts-panel" class="panel table-panel" hidden>
         <div class="panel-head"><h2>Conflicts</h2><span class="panel-note">Hosts claimed by multiple targets</span></div>
         <div id="conflicts" class="table-wrap"></div>
       </section>
@@ -254,7 +278,7 @@
     }
 
     function updateFilterOptions(state) {
-      const rows = [...state.claims, ...state.ignored, ...state.owned_records];
+      const rows = [...state.claims, ...state.ignored, ...state.owned_records, ...state.unifi_target_records];
       const stacks = [...new Set(rows.map((row) => row.stack).filter(Boolean))].sort();
       const services = [...new Set(rows
         .filter((row) => !filters.stack || row.stack === filters.stack)
@@ -268,6 +292,7 @@
       if (!currentState) return;
       updateFilterOptions(currentState);
       const owned = filterRows(currentState.owned_records);
+      const targetCnames = filterRows(currentState.unifi_target_records);
       const claims = filterRows(currentState.claims);
       const ignored = filterRows(currentState.ignored);
       const conflicts = filterRows(
@@ -276,14 +301,23 @@
       );
       $("owned-count").textContent = owned.length;
       $("claims-count").textContent = claims.length;
+      $("target-cname-count").textContent = targetCnames.length;
+      $("stale-cname-count").textContent = targetCnames.filter((row) => row.status === "stale").length;
       $("conflicts-count").textContent = conflicts.length;
       $("ignored-count").textContent = ignored.length;
       const active = [filters.url && `URL contains "${filters.url}"`, filters.stack && `stack ${filters.stack}`, filters.service && `service ${filters.service}`].filter(Boolean);
       $("filter-summary").textContent = active.length ? `Filtered by ${active.join(", ")}` : "Showing all rows";
-      renderTables(owned, claims, ignored, conflicts);
+      renderTables(owned, targetCnames, claims, ignored, conflicts);
     }
 
-    function renderTables(owned, claims, ignored, conflicts) {
+    function renderTables(owned, targetCnames, claims, ignored, conflicts) {
+      renderTable("target-cnames", [
+        {key:"hostname", label:"Hostname"},
+        {key:"target", label:"CNAME target"},
+        {key:"status", label:"Status"},
+        {key:"stack", label:"Stack"},
+        {key:"service", label:"Service"}
+      ], targetCnames, "No UniFi CNAMEs point at current DNS targets");
       renderTable("owned-records", [
         {key:"hostname", label:"Hostname"},
         {key:"target", label:"CNAME target"},
@@ -328,6 +362,15 @@
       $("connection-text").textContent = message;
     }
 
+    function showPanel(id) {
+      document.querySelectorAll(".table-panel").forEach((panel) => {
+        panel.hidden = panel.id !== id;
+      });
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.tab === id);
+      });
+    }
+
     function connectEvents() {
       if (!window.EventSource) {
         setConnection("", "Polling");
@@ -359,6 +402,9 @@
       filters.service = "";
       $("url-filter").value = "";
       renderFilteredState();
+    });
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => showPanel(tab.dataset.tab));
     });
 
     connectEvents();

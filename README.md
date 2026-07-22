@@ -118,7 +118,7 @@ printf '%s' "$UNIFI_API_KEY" | docker secret create unifi_dns_traefik_api_key -
 
 The container exposes:
 
-- `/`: reactive status dashboard with owned records, source claims, ignored labels, conflicts, last error, and service/stack/URL filters.
+- `/`: reactive status dashboard with a UniFi target-CNAME tab, owned records, source claims, ignored labels, conflicts, last error, and service/stack/URL filters.
 - `/api/state`: current dashboard state as JSON.
 - `/events`: server-sent dashboard state events.
 - `/healthz`: process health.

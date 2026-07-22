@@ -14,6 +14,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("stack-filter", html)
         self.assertIn("service-filter", html)
         self.assertIn("url-filter", html)
+        self.assertIn('data-tab="target-cnames-panel"', html)
+        self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)
 
@@ -38,6 +40,27 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(state["ignored"][0]["reason"], "invalid")
         self.assertEqual(state["claims"][0]["stack"], "nginx")
         self.assertEqual(state["claims"][0]["type"], "traefik")
+        self.assertEqual(state["counts"]["unifi_target_records"], 2)
+        self.assertEqual(state["counts"]["stale_unifi_target_records"], 1)
+        self.assertEqual(
+            state["unifi_target_records"],
+            [
+                {
+                    "hostname": "app.home",
+                    "target": "edge.local",
+                    "status": "current",
+                    "stack": "nginx",
+                    "service": "app",
+                },
+                {
+                    "hostname": "old.home",
+                    "target": "edge.local",
+                    "status": "stale",
+                    "stack": "",
+                    "service": "",
+                },
+            ],
+        )
 
 
 class FakeController:
@@ -57,6 +80,16 @@ class FakeController:
     dry_run = True
     last_error = None
     last_reconcile = 123.0
+    localdomain = "local"
+    unifi_records = (
+        {"key": "app.home", "value": "edge.local", "type": "cname"},
+        {"key": "old.home", "value": "edge.local", "type": "cname"},
+        {"key": "txt.home", "value": "edge.local", "type": "txt"},
+        {"key": "other.home", "value": "other.local", "type": "cname"},
+    )
+
+    class plan:
+        desired = {"app.home": "edge", "old-reference.home": "edge"}
 
 
 if __name__ == "__main__":

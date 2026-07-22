@@ -28,6 +28,7 @@ class Controller:
         self.require_enable_label = require_enable_label
         self.conflicts, self.last_error, self.last_reconcile = set(), None, None
         self.ignored, self.claims = (), ()
+        self.unifi_records = ()
         self.plan = RecordPlan(desired={}, conflicts=set())
 
     def reconcile(self, services: list[dict[str, Any]]) -> None:
@@ -41,6 +42,7 @@ class Controller:
         self.conflicts = plan.conflicts
         self.ignored, self.claims = plan.ignored, plan.claims
         records = self.unifi.list()
+        self.unifi_records = tuple(records)
         current = {record["key"]: record for record in records}
         LOG.info(
             json.dumps(

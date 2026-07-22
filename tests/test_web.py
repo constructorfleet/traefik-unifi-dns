@@ -44,6 +44,9 @@ class FakeController:
     conflicts = {"dup.home.prettybaked.com"}
     ignored = ()
     claims = ()
+    unifi_records = ()
+    localdomain = "local"
+    plan = type("Plan", (), {"desired": {}})()
     dry_run = False
     last_error = None
     last_reconcile = 1

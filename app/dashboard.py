@@ -7,6 +7,14 @@ DASHBOARD_TEMPLATE = (Path(__file__).parent / "templates" / "dashboard.html").re
 
 def dashboard_state(controller) -> dict[str, object]:
     claims_by_host = {claim.host: claim for claim in controller.claims}
+    desired_targets = {
+        f"{target}.{controller.localdomain}" for target in controller.plan.desired.values()
+    }
+    unifi_target_records = [
+        _unifi_target_record(record, claims_by_host, controller.plan.desired)
+        for record in controller.unifi_records
+        if _is_cname(record) and record.get("value") in desired_targets
+    ]
     return {
         "dry_run": controller.dry_run,
         "last_error": controller.last_error,
@@ -16,6 +24,10 @@ def dashboard_state(controller) -> dict[str, object]:
             "conflicts": len(controller.conflicts),
             "ignored": len(controller.ignored),
             "claims": len(controller.claims),
+            "unifi_target_records": len(unifi_target_records),
+            "stale_unifi_target_records": sum(
+                1 for record in unifi_target_records if record["status"] == "stale"
+            ),
         },
         "owned_records": [
             {
@@ -48,8 +60,26 @@ def dashboard_state(controller) -> dict[str, object]:
             }
             for claim in controller.claims
         ],
+        "unifi_target_records": unifi_target_records,
     }
 
 
 def render_dashboard():
     return DASHBOARD_TEMPLATE
+
+
+def _is_cname(record: dict[str, object]) -> bool:
+    return str(record.get("type", "cname")).lower() == "cname"
+
+
+def _unifi_target_record(record, claims_by_host, desired):
+    hostname = record.get("key", "")
+    claim = claims_by_host.get(hostname)
+    status = "current" if hostname in desired else "stale"
+    return {
+        "hostname": hostname,
+        "target": record.get("value", ""),
+        "status": status,
+        "stack": claim.stack if claim else "",
+        "service": claim.service if claim else "",
+    }
