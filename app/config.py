@@ -15,6 +15,7 @@ from .traefik import normalize_host, valid_hostname, valid_target
 class Settings:
     docker_host: str
     unifi_url: str
+    unifi_verify_ssl: bool
     allowed_zones: tuple[str, ...]
     state_path: Path
     unifi_api_key_file: Path
@@ -30,6 +31,10 @@ class Settings:
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         values = os.environ if env is None else env
         unifi_url = _env_value(values, "UNIFI_URL", "").strip()
+        unifi_verify_ssl = _parse_bool(
+            _env_value(values, "UNIFI_VERIFY_SSL", "true"),
+            "UNIFI_VERIFY_SSL",
+        )
         allowed_zones = tuple(
             normalize_host(zone.strip())
             for zone in _env_value(values, "ALLOWED_ZONES", "").split(",")
@@ -66,6 +71,7 @@ class Settings:
         return cls(
             docker_host=_env_value(values, "DOCKER_HOST", "unix:///var/run/docker.sock").strip(),
             unifi_url=unifi_url,
+            unifi_verify_ssl=unifi_verify_ssl,
             allowed_zones=allowed_zones,
             state_path=Path(_env_value(values, "STATE_PATH", "/state/ownership.json")),
             unifi_api_key_file=Path(

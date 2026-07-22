@@ -6,6 +6,7 @@ services:
       # is supported for an explicitly configured direct-socket deployment.
       DOCKER_HOST: ${DOCKER_HOST:-http://docker-socket-proxy:2375}
       UNIFI_URL: ${UNIFI_URL:?set UNIFI_URL}
+      UNIFI_VERIFY_SSL: ${UNIFI_VERIFY_SSL:-true}
       ALLOWED_ZONES: ${ALLOWED_ZONES:-home.prettybaked.com,home.constructorfleet.stream}
       DRY_RUN: ${DRY_RUN:-false}
       REQUIRE_UNIFI_DNS_ENABLE: ${REQUIRE_UNIFI_DNS_ENABLE:-true}

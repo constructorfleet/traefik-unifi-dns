@@ -12,7 +12,11 @@ from app.web import serve
 
 def build_controller(settings: Settings, state_store: JsonStateStore) -> Controller:
     return Controller(
-        UnifiStaticDnsClient(settings.unifi_url, settings.unifi_api_key_file),
+        UnifiStaticDnsClient(
+            settings.unifi_url,
+            settings.unifi_api_key_file,
+            settings.unifi_verify_ssl,
+        ),
         settings.allowed_zones,
         state_store.load(),
         settings.default_target,

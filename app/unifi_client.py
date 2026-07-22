@@ -9,12 +9,18 @@ import requests
 
 
 class UnifiStaticDnsClient:
-    def __init__(self, base_url: str, api_key_file: Path) -> None:
+    def __init__(self, base_url: str, api_key_file: Path, verify_ssl: bool = True) -> None:
         self.url = base_url.rstrip("/") + "/proxy/network/v2/api/site/default/static-dns"
         self.headers = {"X-API-Key": api_key_file.read_text().strip()}
+        self.verify_ssl = verify_ssl
 
     def list(self) -> list[dict[str, Any]]:
-        response = requests.get(self.url, headers=self.headers, timeout=20)
+        response = requests.get(
+            self.url,
+            headers=self.headers,
+            timeout=20,
+            verify=self.verify_ssl,
+        )
         response.raise_for_status()
         body = response.json()
         if isinstance(body, list):
@@ -31,7 +37,12 @@ class UnifiStaticDnsClient:
         self._write("put", {"key": host, "value": target, "type": "cname"})
 
     def delete(self, host: str) -> None:
-        response = requests.delete(f"{self.url}/{host}", headers=self.headers, timeout=20)
+        response = requests.delete(
+            f"{self.url}/{host}",
+            headers=self.headers,
+            timeout=20,
+            verify=self.verify_ssl,
+        )
         response.raise_for_status()
 
     def _write(self, method: str, payload: dict[str, str]) -> None:
@@ -40,5 +51,6 @@ class UnifiStaticDnsClient:
             headers=self.headers,
             json=payload,
             timeout=20,
+            verify=self.verify_ssl,
         )
         response.raise_for_status()

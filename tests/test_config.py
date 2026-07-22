@@ -15,6 +15,7 @@ class SettingsTests(unittest.TestCase):
                 "CNAME_LOCALDOMAIN": "Lan.",
                 "DRY_RUN": "yes",
                 "REQUIRE_UNIFI_DNS_ENABLE": "false",
+                "UNIFI_VERIFY_SSL": "false",
                 "RECONCILE_INTERVAL_SECONDS": "60",
                 "PORT": "8081",
                 "LOG_LEVEL": "debug",
@@ -29,6 +30,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.cname_localdomain, "lan")
         self.assertTrue(settings.dry_run)
         self.assertFalse(settings.require_unifi_dns_enable)
+        self.assertFalse(settings.unifi_verify_ssl)
         self.assertEqual(settings.log_level, "DEBUG")
 
     def test_rejects_invalid_dns_and_target_values(self):
@@ -45,6 +47,7 @@ class SettingsTests(unittest.TestCase):
     def test_rejects_invalid_boolean_interval_port_and_log_level(self):
         invalid_envs = [
             {"DRY_RUN": "maybe"},
+            {"UNIFI_VERIFY_SSL": "sometimes"},
             {"RECONCILE_INTERVAL_SECONDS": "0"},
             {"RECONCILE_INTERVAL_SECONDS": "abc"},
             {"PORT": "0"},

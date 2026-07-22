@@ -71,6 +71,7 @@ conflict and no UniFi record is changed for that host.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `UNIFI_URL` | yes | none | Base URL for the UniFi Network application. |
+| `UNIFI_VERIFY_SSL` | no | `true` | Verify the UniFi HTTPS certificate. Set to `false` for self-signed controller certificates, such as `https://192.168.1.1`. |
 | `ALLOWED_ZONES` | yes | none | Comma-separated DNS zones the controller may manage. |
 | `DOCKER_HOST` | no | `unix:///var/run/docker.sock` | Docker endpoint. Use `http://docker-socket-proxy:2375` or Docker-style `tcp://docker-socket-proxy:2375` for a socket proxy. |
 | `UNIFI_API_KEY_FILE` | no | `/run/secrets/unifi_api_key` | File containing the UniFi API key. |
