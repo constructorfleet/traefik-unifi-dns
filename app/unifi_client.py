@@ -17,7 +17,12 @@ class UnifiStaticDnsClient:
         response = requests.get(self.url, headers=self.headers, timeout=20)
         response.raise_for_status()
         body = response.json()
-        return body.get("data", body if isinstance(body, list) else [])
+        if isinstance(body, list):
+            return body
+        if isinstance(body, dict):
+            data = body.get("data", [])
+            return data if isinstance(data, list) else []
+        return []
 
     def create(self, host: str, target: str) -> None:
         self._write("post", {"key": host, "value": target, "type": "cname"})
