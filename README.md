@@ -89,6 +89,10 @@ and then validated as if the direct environment variable had been set. Setting b
 `NAME_FILE` is rejected at startup. `UNIFI_API_KEY_FILE` remains the file path used to read the
 UniFi API key itself.
 
+In dry-run mode, create/update/delete candidates are logged with `"result": "dry_run"`. The
+ownership state file is not updated, because dry-run records were not actually created and should
+not become eligible for later deletion as controller-owned records.
+
 ## Deployment
 
 For local development:

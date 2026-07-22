@@ -322,7 +322,10 @@ class ReconcileTests(unittest.TestCase):
         ownership = {}
         controller = Controller(api, ["home.prettybaked.com"], ownership, dry_run=True)
 
-        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+        with self.assertLogs("app.controller", level="INFO") as logs:
+            controller.reconcile(
+                [service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")]
+            )
 
         self.assertEqual(api.created, [])
         self.assertEqual(api.updated, [])
@@ -330,6 +333,31 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(ownership, {})
         self.assertEqual(controller.ownership, {})
         self.assertEqual(controller.plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+        self.assertIn('"action": "create"', "\n".join(logs.output))
+        self.assertIn('"result": "dry_run"', "\n".join(logs.output))
+
+    def test_dry_run_logs_update_and_delete_candidates(self):
+        api = FakeUnifi([{"key": "app.home.prettybaked.com", "value": "old.local"}])
+        ownership = {
+            "app.home.prettybaked.com": "old.local",
+            "stale.home.prettybaked.com": "docker-swarm.local",
+        }
+        controller = Controller(api, ["home.prettybaked.com"], ownership, dry_run=True)
+
+        with self.assertLogs("app.controller", level="INFO") as logs:
+            controller.reconcile(
+                [service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")]
+            )
+
+        messages = "\n".join(logs.output)
+        self.assertEqual(api.updated, [])
+        self.assertEqual(api.deleted, [])
+        self.assertEqual(ownership["app.home.prettybaked.com"], "old.local")
+        self.assertIn('"action": "update"', messages)
+        self.assertIn('"hostname": "app.home.prettybaked.com"', messages)
+        self.assertIn('"action": "delete"', messages)
+        self.assertIn('"hostname": "stale.home.prettybaked.com"', messages)
+        self.assertIn('"result": "dry_run"', messages)
 
     def test_dry_run_still_applies_when_enable_label_is_not_required(self):
         api = FakeUnifi([])

@@ -66,6 +66,16 @@ class Controller:
             record = current.get(host)
             if record is None:
                 if self.dry_run:
+                    LOG.info(
+                        json.dumps(
+                            {
+                                "hostname": host,
+                                "target": fq_target,
+                                "action": "create",
+                                "result": "dry_run",
+                            }
+                        )
+                    )
                     continue
                 self.unifi.create(host, fq_target)
                 self.ownership[host] = fq_target
@@ -76,6 +86,17 @@ class Controller:
                 )
             elif self.ownership.get(host) and record.get("value") != fq_target:
                 if self.dry_run:
+                    LOG.info(
+                        json.dumps(
+                            {
+                                "hostname": host,
+                                "target": fq_target,
+                                "current_target": record.get("value"),
+                                "action": "update",
+                                "result": "dry_run",
+                            }
+                        )
+                    )
                     continue
                 self.unifi.update(host, fq_target)
                 self.ownership[host] = fq_target
@@ -87,6 +108,16 @@ class Controller:
         for host in list(self.ownership):
             if host not in plan.desired and host not in self.conflicts:
                 if self.dry_run:
+                    LOG.info(
+                        json.dumps(
+                            {
+                                "hostname": host,
+                                "target": self.ownership[host],
+                                "action": "delete",
+                                "result": "dry_run",
+                            }
+                        )
+                    )
                     continue
                 if host in current:
                     self.unifi.delete(host)
