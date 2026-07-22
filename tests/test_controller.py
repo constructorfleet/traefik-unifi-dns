@@ -69,6 +69,47 @@ class RuleExtractionTests(unittest.TestCase):
         self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
         self.assertEqual(plan.conflicts, {"dup.home.prettybaked.com"})
 
+    def test_source_label_adds_manual_hosts(self):
+        services = [
+            {
+                "Spec": {
+                    "Name": "app",
+                    "Labels": {
+                        "unifi-dns.enable": "true",
+                        "unifi-dns.source": (
+                            "manual.home.prettybaked.com,extra.home.prettybaked.com"
+                        ),
+                    },
+                }
+            }
+        ]
+
+        self.assertEqual(
+            desired_records(services, ["home.prettybaked.com"]),
+            {
+                "manual.home.prettybaked.com": "docker-swarm",
+                "extra.home.prettybaked.com": "docker-swarm",
+            },
+        )
+
+    def test_source_label_still_requires_allowed_zone(self):
+        services = [
+            {
+                "Spec": {
+                    "Name": "app",
+                    "Labels": {
+                        "unifi-dns.enable": "true",
+                        "unifi-dns.source": "manual.home.prettybaked.com,manual.example.net",
+                    },
+                }
+            }
+        ]
+
+        self.assertEqual(
+            desired_records(services, ["home.prettybaked.com"]),
+            {"manual.home.prettybaked.com": "docker-swarm"},
+        )
+
 
 class ReconcileTests(unittest.TestCase):
     def test_create_update_noop_and_safe_removal(self):

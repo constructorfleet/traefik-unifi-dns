@@ -39,12 +39,15 @@ A service opts in with:
 deploy:
   labels:
     unifi-dns.enable: "true"
+    unifi-dns.source: "app.home.example.com"
     unifi-dns.target: "docker-swarm"
     traefik.http.routers.app.rule: Host(`app.home.example.com`)
 ```
 
-Only literal Traefik `Host(...)` values are accepted. `HostRegexp`, wildcards, malformed rules,
-and hostnames outside `ALLOWED_ZONES` are ignored.
+Sources can come from literal Traefik `Host(...)` values or from a comma/whitespace-separated
+`unifi-dns.source` label. `HostRegexp`, wildcards, malformed rules, and hostnames outside
+`ALLOWED_ZONES` are ignored. `ALLOWED_ZONES` is an allowlist for fully qualified hostnames; it
+does not append zones to short source names.
 
 If two services claim the same hostname with different targets, the hostname is treated as a
 conflict and no UniFi record is changed for that host.

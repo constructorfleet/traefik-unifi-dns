@@ -32,6 +32,18 @@ def extract_hosts(rule: object) -> list[str]:
     return hosts
 
 
+def extract_sources(source: object) -> list[str]:
+    """Return explicit source hostnames from a unifi-dns.source label."""
+    if not isinstance(source, str):
+        return []
+    hosts = []
+    for value in re.split(r"[\s,]+", source):
+        host = normalize_host(value.strip())
+        if host and "*" not in host:
+            hosts.append(host)
+    return hosts
+
+
 def desired_records(
     services: list[dict[str, Any]],
     zones: tuple[str, ...] | list[str],
@@ -58,6 +70,9 @@ def plan_records(
         target = labels.get("unifi-dns.target", default_target).strip().lower()
         if not target or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", target):
             continue
+        for host in extract_sources(labels.get("unifi-dns.source")):
+            if _allowed(host, normalized_zones):
+                claims[host].add(target)
         for key, rule in labels.items():
             if key.startswith("traefik.http.routers.") and key.endswith(".rule"):
                 for host in extract_hosts(rule):
