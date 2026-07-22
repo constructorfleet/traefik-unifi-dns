@@ -38,4 +38,6 @@ class DockerClient:
         if endpoint.startswith("unix://"):
             socket_path = endpoint.removeprefix("unix://").replace("/", "%2F")
             return f"http+unix://{socket_path}/{api_version}"
+        if endpoint.startswith("tcp://"):
+            endpoint = "http://" + endpoint.removeprefix("tcp://")
         return f"{endpoint.rstrip('/')}/{api_version}"

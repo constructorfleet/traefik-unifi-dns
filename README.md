@@ -69,7 +69,7 @@ conflict and no UniFi record is changed for that host.
 | --- | --- | --- | --- |
 | `UNIFI_URL` | yes | none | Base URL for the UniFi Network application. |
 | `ALLOWED_ZONES` | yes | none | Comma-separated DNS zones the controller may manage. |
-| `DOCKER_HOST` | no | `unix:///var/run/docker.sock` | Docker endpoint. Use `http://docker-socket-proxy:2375` for a socket proxy. |
+| `DOCKER_HOST` | no | `unix:///var/run/docker.sock` | Docker endpoint. Use `http://docker-socket-proxy:2375` or Docker-style `tcp://docker-socket-proxy:2375` for a socket proxy. |
 | `UNIFI_API_KEY_FILE` | no | `/run/secrets/unifi_api_key` | File containing the UniFi API key. |
 | `STATE_PATH` | no | `/state/ownership.json` | Persistent ownership-state file. |
 | `DEFAULT_TARGET` | no | `docker-swarm` | CNAME target label fallback. |
