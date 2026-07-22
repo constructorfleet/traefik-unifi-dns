@@ -227,6 +227,23 @@ class ReconcileTests(unittest.TestCase):
         controller.reconcile([])
         self.assertEqual(api.deleted, ["app.home.prettybaked.com"])
 
+    def test_reconcile_logs_summary_counts(self):
+        api = FakeUnifi([])
+        controller = Controller(api, ["home.prettybaked.com"], {})
+
+        with self.assertLogs("app.controller", level="INFO") as logs:
+            controller.reconcile(
+                [service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")]
+            )
+
+        messages = "\n".join(logs.output)
+        self.assertIn('"action": "plan"', messages)
+        self.assertIn('"services": 1', messages)
+        self.assertIn('"desired": 1', messages)
+        self.assertIn('"unifi_records": 0', messages)
+        self.assertIn('"action": "reconcile"', messages)
+        self.assertIn('"owned_records": 1', messages)
+
     def test_controller_exposes_ignored_sources(self):
         api = FakeUnifi([])
         controller = Controller(api, ["home.prettybaked.com"], {})

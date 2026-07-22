@@ -33,7 +33,23 @@ class Controller:
         self.plan = plan
         self.conflicts = plan.conflicts
         self.ignored, self.claims = plan.ignored, plan.claims
-        current = {record["key"]: record for record in self.unifi.list()}
+        records = self.unifi.list()
+        current = {record["key"]: record for record in records}
+        LOG.info(
+            json.dumps(
+                {
+                    "action": "plan",
+                    "services": len(services),
+                    "claims": len(plan.claims),
+                    "desired": len(plan.desired),
+                    "conflicts": len(plan.conflicts),
+                    "ignored": len(plan.ignored),
+                    "unifi_records": len(records),
+                    "owned_records": len(self.ownership),
+                    "dry_run": self.dry_run,
+                }
+            )
+        )
         for host, target in plan.desired.items():
             fq_target = target + "." + self.localdomain
             record = current.get(host)
@@ -66,3 +82,16 @@ class Controller:
                 del self.ownership[host]
                 LOG.info(json.dumps({"hostname": host, "action": "delete", "result": "ok"}))
         self.last_error, self.last_reconcile = None, time.time()
+        LOG.info(
+            json.dumps(
+                {
+                    "action": "reconcile",
+                    "result": "ok",
+                    "desired": len(plan.desired),
+                    "conflicts": len(plan.conflicts),
+                    "ignored": len(plan.ignored),
+                    "owned_records": len(self.ownership),
+                    "dry_run": self.dry_run,
+                }
+            )
+        )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 
@@ -40,12 +41,31 @@ class ReconcileWorker:
                 time.sleep(self.error_sleep_seconds)
 
     def reconcile_once(self) -> None:
-        self.controller.reconcile(self.docker.list_services())
+        services = self.docker.list_services()
+        LOG.info(json.dumps({"action": "docker_services", "services": len(services)}))
+        self.controller.reconcile(services)
         self.state_store.save(self.controller.ownership)
+        LOG.info(
+            json.dumps(
+                {
+                    "action": "state_save",
+                    "owned_records": len(self.controller.ownership),
+                }
+            )
+        )
 
     def wait_for_service_events(self) -> None:
         response = self.docker.stream_service_events()
         response.raise_for_status()
+        LOG.info(
+            json.dumps(
+                {
+                    "action": "docker_events",
+                    "result": "connected",
+                    "timeout_seconds": self.reconcile_interval_seconds,
+                }
+            )
+        )
         deadline = time.monotonic() + self.reconcile_interval_seconds
         try:
             for _line in response.iter_lines():
