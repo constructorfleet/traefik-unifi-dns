@@ -51,6 +51,8 @@ class SettingsTests(unittest.TestCase):
             {"DRY_RUN": "maybe"},
             {"UNIFI_VERIFY_SSL": "sometimes"},
             {"ALWAYS_SHOW_DELETE": "occasionally"},
+            {"OIDC_ENABLED": "sure"},
+            {"OIDC_COOKIE_SECURE": "nah"},
             {"RECONCILE_INTERVAL_SECONDS": "0"},
             {"RECONCILE_INTERVAL_SECONDS": "abc"},
             {"PORT": "0"},
@@ -113,6 +115,82 @@ class SettingsTests(unittest.TestCase):
                 {
                     "UNIFI_URL_FILE": "/missing/nope",
                     "ALLOWED_ZONES": "home.prettybaked.com",
+                }
+            )
+
+    def test_parses_oidc_settings(self):
+        settings = Settings.from_env(
+            {
+                "UNIFI_URL": "https://unifi.local",
+                "ALLOWED_ZONES": "home.prettybaked.com",
+                "OIDC_ENABLED": "true",
+                "OIDC_DISCOVERY_URL": "https://idp.example.com/.well-known/openid-configuration",
+                "OIDC_CLIENT_ID": "unifi-dns",
+                "OIDC_CLIENT_SECRET": "secret",
+                "OIDC_REDIRECT_URI": "https://dns.example.com/oidc/callback",
+                "OIDC_SCOPES": "openid email profile groups",
+                "OIDC_ALLOWED_GROUPS": "admins, dns-ops ",
+                "OIDC_GROUPS_CLAIM": "roles",
+                "OIDC_COOKIE_SECRET": "cookie-secret",
+                "OIDC_COOKIE_SECURE": "false",
+            }
+        )
+
+        self.assertTrue(settings.oidc.enabled)
+        self.assertEqual(
+            settings.oidc.discovery_url,
+            "https://idp.example.com/.well-known/openid-configuration",
+        )
+        self.assertEqual(settings.oidc.client_id, "unifi-dns")
+        self.assertEqual(settings.oidc.client_secret, "secret")
+        self.assertEqual(settings.oidc.redirect_uri, "https://dns.example.com/oidc/callback")
+        self.assertEqual(settings.oidc.scopes, ("openid", "email", "profile", "groups"))
+        self.assertEqual(settings.oidc.allowed_groups, ("admins", "dns-ops"))
+        self.assertEqual(settings.oidc.groups_claim, "roles")
+        self.assertEqual(settings.oidc.cookie_secret, "cookie-secret")
+        self.assertFalse(settings.oidc.cookie_secure)
+
+    def test_rejects_incomplete_oidc_settings_when_enabled(self):
+        required = [
+            "OIDC_DISCOVERY_URL",
+            "OIDC_CLIENT_ID",
+            "OIDC_CLIENT_SECRET",
+            "OIDC_COOKIE_SECRET",
+        ]
+        base = {
+            "UNIFI_URL": "https://unifi.local",
+            "ALLOWED_ZONES": "home.prettybaked.com",
+            "OIDC_ENABLED": "true",
+            "OIDC_DISCOVERY_URL": "https://idp.example.com/.well-known/openid-configuration",
+            "OIDC_CLIENT_ID": "unifi-dns",
+            "OIDC_CLIENT_SECRET": "secret",
+            "OIDC_COOKIE_SECRET": "cookie-secret",
+        }
+
+        for missing in required:
+            env = dict(base)
+            env[missing] = ""
+            with (
+                self.subTest(missing=missing),
+                self.assertRaisesRegex(
+                    ValueError,
+                    f"{missing} is required",
+                ),
+            ):
+                Settings.from_env(env)
+
+    def test_rejects_oidc_scopes_without_openid(self):
+        with self.assertRaisesRegex(ValueError, "OIDC_SCOPES must include openid"):
+            Settings.from_env(
+                {
+                    "UNIFI_URL": "https://unifi.local",
+                    "ALLOWED_ZONES": "home.prettybaked.com",
+                    "OIDC_ENABLED": "true",
+                    "OIDC_DISCOVERY_URL": "https://idp.example.com/.well-known/openid-configuration",
+                    "OIDC_CLIENT_ID": "unifi-dns",
+                    "OIDC_CLIENT_SECRET": "secret",
+                    "OIDC_COOKIE_SECRET": "cookie-secret",
+                    "OIDC_SCOPES": "email profile",
                 }
             )
 

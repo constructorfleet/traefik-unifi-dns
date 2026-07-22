@@ -12,6 +12,20 @@ from .traefik import normalize_host, valid_hostname, valid_target
 
 
 @dataclass(frozen=True)
+class OidcSettings:
+    enabled: bool
+    discovery_url: str
+    client_id: str
+    client_secret: str
+    redirect_uri: str
+    scopes: tuple[str, ...]
+    allowed_groups: tuple[str, ...]
+    groups_claim: str
+    cookie_secret: str
+    cookie_secure: bool
+
+
+@dataclass(frozen=True)
 class Settings:
     docker_host: str
     unifi_url: str
@@ -27,6 +41,7 @@ class Settings:
     reconcile_interval_seconds: int
     port: int
     log_level: str
+    oidc: OidcSettings
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -58,6 +73,7 @@ class Settings:
         )
         port = _parse_port(_env_value(values, "PORT", "8080"))
         log_level = _env_value(values, "LOG_LEVEL", "INFO").strip().upper()
+        oidc = _oidc_settings(values)
 
         if not unifi_url:
             raise ValueError("UNIFI_URL is required")
@@ -90,6 +106,7 @@ class Settings:
             reconcile_interval_seconds=reconcile_interval_seconds,
             port=port,
             log_level=log_level,
+            oidc=oidc,
         )
 
 
@@ -132,3 +149,54 @@ def _parse_port(value: str) -> int:
     if port > 65535:
         raise ValueError("PORT must be between 1 and 65535")
     return port
+
+
+def _oidc_settings(values: Mapping[str, str]) -> OidcSettings:
+    enabled = _parse_bool(_env_value(values, "OIDC_ENABLED", "false"), "OIDC_ENABLED")
+    discovery_url = _env_value(values, "OIDC_DISCOVERY_URL", "").strip()
+    client_id = _env_value(values, "OIDC_CLIENT_ID", "").strip()
+    client_secret = _env_value(values, "OIDC_CLIENT_SECRET", "").strip()
+    redirect_uri = _env_value(values, "OIDC_REDIRECT_URI", "").strip()
+    scopes = tuple(
+        scope
+        for scope in _env_value(values, "OIDC_SCOPES", "openid email profile").split()
+        if scope
+    )
+    allowed_groups = tuple(
+        group.strip()
+        for group in _env_value(values, "OIDC_ALLOWED_GROUPS", "").split(",")
+        if group.strip()
+    )
+    groups_claim = _env_value(values, "OIDC_GROUPS_CLAIM", "groups").strip()
+    cookie_secret = _env_value(values, "OIDC_COOKIE_SECRET", "").strip()
+    cookie_secure = _parse_bool(
+        _env_value(values, "OIDC_COOKIE_SECURE", "true"),
+        "OIDC_COOKIE_SECURE",
+    )
+    if enabled:
+        missing = [
+            name
+            for name, value in {
+                "OIDC_DISCOVERY_URL": discovery_url,
+                "OIDC_CLIENT_ID": client_id,
+                "OIDC_CLIENT_SECRET": client_secret,
+                "OIDC_COOKIE_SECRET": cookie_secret,
+            }.items()
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"{missing[0]} is required when OIDC_ENABLED=true")
+        if not scopes or "openid" not in scopes:
+            raise ValueError("OIDC_SCOPES must include openid")
+    return OidcSettings(
+        enabled=enabled,
+        discovery_url=discovery_url,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        scopes=scopes,
+        allowed_groups=allowed_groups,
+        groups_claim=groups_claim or "groups",
+        cookie_secret=cookie_secret,
+        cookie_secure=cookie_secure,
+    )

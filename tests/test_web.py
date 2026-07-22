@@ -193,6 +193,102 @@ class WebEndpointTests(unittest.TestCase):
         )
         self.assertEqual(state_store.saved[-1][1], controller.manual_metadata)
 
+    def test_oidc_protects_dashboard_and_api_routes(self):
+        controller = FakeController()
+        authenticator = FakeAuthenticator()
+        server = DashboardHttpServer(
+            ("127.0.0.1", 0),
+            controller,
+            authenticator=authenticator,
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            dashboard_status, dashboard_headers, dashboard_body = self.request_with_headers(
+                server,
+                "GET",
+                "/",
+            )
+            api_status, _api_headers, api_body = self.request_with_headers(
+                server,
+                "GET",
+                "/api/state",
+            )
+            auth_status, _auth_headers, auth_body = self.request_with_headers(
+                server,
+                "GET",
+                "/",
+                headers={"Cookie": "oidc_session=session-cookie"},
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(dashboard_status, 302)
+        self.assertEqual(dashboard_headers["Location"], "/login")
+        self.assertEqual(dashboard_body, b"")
+        self.assertEqual(api_status, 401)
+        self.assertEqual(json.loads(api_body), {"error": "authentication required"})
+        self.assertEqual(auth_status, 200)
+        self.assertIn(b"UniFi DNS Traefik", auth_body)
+
+    def test_oidc_login_callback_and_logout_routes_manage_cookies(self):
+        controller = FakeController()
+        authenticator = FakeAuthenticator()
+        server = DashboardHttpServer(
+            ("127.0.0.1", 0),
+            controller,
+            authenticator=authenticator,
+        )
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            login_status, login_headers, _login_body = self.request_with_headers(
+                server,
+                "GET",
+                "/login",
+            )
+            callback_status, callback_headers, _callback_body = self.request_with_headers(
+                server,
+                "GET",
+                "/oidc/callback?code=code-1&state=state-1",
+                headers={"Cookie": "oidc_state=state-cookie"},
+            )
+            logout_status, logout_headers, _logout_body = self.request_with_headers(
+                server,
+                "GET",
+                "/logout",
+                headers={"Cookie": "oidc_session=session-cookie"},
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(login_status, 302)
+        self.assertEqual(login_headers["Location"], "https://idp.example.com/auth")
+        self.assertIn("oidc_state=state-cookie", login_headers["Set-Cookie"])
+        self.assertEqual(callback_status, 302)
+        self.assertEqual(callback_headers["Location"], "/")
+        self.assertIn("oidc_session=session-cookie", callback_headers["Set-Cookie"])
+        self.assertEqual(
+            authenticator.callbacks,
+            [
+                (
+                    "code-1",
+                    "state-1",
+                    "state-cookie",
+                    f"http://127.0.0.1:{server.server_address[1]}/oidc/callback",
+                )
+            ],
+        )
+        self.assertEqual(logout_status, 302)
+        self.assertEqual(logout_headers["Location"], "/")
+        self.assertIn(
+            "oidc_session=; Path=/; SameSite=Lax; Max-Age=0", logout_headers["Set-Cookie"]
+        )
+
     def request(self, server, method, path, body=None):
         connection = http.client.HTTPConnection(*server.server_address, timeout=5)
         try:
@@ -204,6 +300,46 @@ class WebEndpointTests(unittest.TestCase):
             connection.close()
 
         return response.status, body
+
+    def request_with_headers(self, server, method, path, body=None, headers=None):
+        connection = http.client.HTTPConnection(*server.server_address, timeout=5)
+        try:
+            request_headers = dict(headers or {})
+            if body:
+                request_headers.setdefault("Content-Type", "application/json")
+            connection.request(method, path, body=body, headers=request_headers)
+            response = connection.getresponse()
+            body = response.read()
+            response_headers = {}
+            for name, value in response.getheaders():
+                response_headers[name] = (
+                    f"{response_headers[name]}\n{value}" if name in response_headers else value
+                )
+        finally:
+            connection.close()
+
+        return response.status, response_headers, body
+
+
+class FakeAuthenticator:
+    enabled = True
+    settings = type("Settings", (), {"cookie_secure": False})()
+
+    def __init__(self):
+        self.callbacks = []
+
+    def authorization_url(self, callback_url):
+        self.callback_url = callback_url
+        return "https://idp.example.com/auth", "state-cookie"
+
+    def callback(self, code, state, state_cookie, callback_url):
+        self.callbacks.append((code, state, state_cookie, callback_url))
+        return "session-cookie"
+
+    def user(self, session_cookie):
+        if session_cookie == "session-cookie":
+            return object()
+        return None
 
 
 class FakeController:

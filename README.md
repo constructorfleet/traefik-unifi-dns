@@ -25,6 +25,7 @@ The service is split by responsibility:
 - `app/dashboard.py`: status UI template rendering.
 - `app/templates/dashboard.html`: dashboard markup.
 - `app/web.py`: health, readiness, metrics, and dashboard HTTP routes.
+- `app/auth.py`: optional OIDC authorization-code dashboard authentication.
 - `app/config.py`: environment parsing and validation.
 - `app/main.py`: composition root.
 
@@ -85,12 +86,47 @@ conflict and no UniFi record is changed for that host.
 | `RECONCILE_INTERVAL_SECONDS` | no | `300` | Maximum time between full reconciles while watching events. |
 | `PORT` | no | `8080` | HTTP UI and health endpoint port. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level. |
+| `OIDC_ENABLED` | no | `false` | Require OIDC login for the dashboard, JSON API, and SSE stream. Health, readiness, and Prometheus metrics remain unauthenticated. |
+| `OIDC_DISCOVERY_URL` | when OIDC is enabled | none | OIDC discovery document URL, usually ending in `/.well-known/openid-configuration`. |
+| `OIDC_CLIENT_ID` | when OIDC is enabled | none | OIDC application/client ID. |
+| `OIDC_CLIENT_SECRET` | when OIDC is enabled | none | OIDC client secret. Prefer `OIDC_CLIENT_SECRET_FILE` for Swarm secrets. |
+| `OIDC_REDIRECT_URI` | no | request callback URL | Explicit callback URL registered with the provider. If unset, the app derives `https?://host/oidc/callback` from request headers. |
+| `OIDC_SCOPES` | no | `openid email profile` | Space-separated scopes requested during login. Must include `openid` when OIDC is enabled; add provider-specific group scopes when required. |
+| `OIDC_ALLOWED_GROUPS` | no | none | Comma-separated group allowlist. If empty, any successfully authenticated user is allowed. |
+| `OIDC_GROUPS_CLAIM` | no | `groups` | Claim name used to read group membership from userinfo or ID token claims. |
+| `OIDC_COOKIE_SECRET` | when OIDC is enabled | none | HMAC secret used to sign login state and session cookies. Prefer `OIDC_COOKIE_SECRET_FILE`. |
+| `OIDC_COOKIE_SECURE` | no | `true` | Add the `Secure` attribute to OIDC cookies. Set to `false` only for plain-HTTP local testing. |
 
 Every value-style environment variable also supports a Docker-style `_FILE` companion, such as
-`UNIFI_URL_FILE`, `ALLOWED_ZONES_FILE`, or `DRY_RUN_FILE`. The file contents are read, trimmed,
-and then validated as if the direct environment variable had been set. Setting both `NAME` and
-`NAME_FILE` is rejected at startup. `UNIFI_API_KEY_FILE` remains the file path used to read the
-UniFi API key itself.
+`UNIFI_URL_FILE`, `ALLOWED_ZONES_FILE`, `DRY_RUN_FILE`, `OIDC_CLIENT_SECRET_FILE`, or
+`OIDC_COOKIE_SECRET_FILE`. The file contents are read, trimmed, and then validated as if the
+direct environment variable had been set. Setting both `NAME` and `NAME_FILE` is rejected at
+startup. `UNIFI_API_KEY_FILE` remains the file path used to read the UniFi API key itself.
+
+### OIDC
+
+When `OIDC_ENABLED=true`, register the dashboard as an authorization-code OIDC application with
+your identity provider. The callback path is `/oidc/callback`; set `OIDC_REDIRECT_URI` if the app
+is behind a proxy and the inferred URL is not the exact public callback registered with the
+provider.
+
+For a typical deployment:
+
+```yaml
+environment:
+  OIDC_ENABLED: "true"
+  OIDC_DISCOVERY_URL: "https://idp.example.com/.well-known/openid-configuration"
+  OIDC_CLIENT_ID: "unifi-dns-traefik"
+  OIDC_CLIENT_SECRET_FILE: "/run/secrets/unifi_dns_traefik_oidc_client_secret"
+  OIDC_COOKIE_SECRET_FILE: "/run/secrets/unifi_dns_traefik_oidc_cookie_secret"
+  OIDC_SCOPES: "openid email profile groups"
+  OIDC_ALLOWED_GROUPS: "dns-admins,platform-admins"
+  OIDC_GROUPS_CLAIM: "groups"
+  OIDC_COOKIE_SECURE: "true"
+```
+
+`OIDC_ALLOWED_GROUPS` is optional. Leave it empty to allow any user accepted by the provider.
+Use `OIDC_GROUPS_CLAIM` when your provider emits groups under a different claim, such as `roles`.
 
 In dry-run mode, create/update/delete candidates are logged with `"result": "dry_run"`. The
 ownership state file is not updated, because dry-run records were not actually created and should
@@ -132,6 +168,10 @@ The container exposes:
 - `/healthz`: process health.
 - `/readyz`: readiness after the first successful reconcile.
 - `/metrics`: Prometheus-compatible gauges.
+
+When OIDC is enabled, `/`, `/api/state`, `/api/cname`, `/api/cname-metadata`,
+`/api/stale-cname`, and `/events` require a valid login. `/healthz`, `/readyz`, and `/metrics`
+stay public so load balancers and Prometheus can keep working without OIDC credentials.
 
 The Docker event stream is long-lived and may reconnect after an idle read timeout. This is logged
 as `{"action":"docker_events","result":"reconnect"}` and the next loop performs a fresh reconcile.

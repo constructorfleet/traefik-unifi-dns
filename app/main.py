@@ -1,6 +1,7 @@
 import logging
 import threading
 
+from app.auth import OidcAuthenticator
 from app.config import Settings
 from app.controller import Controller
 from app.docker_client import DockerClient
@@ -34,6 +35,7 @@ def main() -> None:
 
     state_store = JsonStateStore(settings.state_path)
     controller = build_controller(settings, state_store)
+    authenticator = OidcAuthenticator(settings.oidc) if settings.oidc.enabled else None
     worker = ReconcileWorker(
         controller,
         DockerClient(settings.docker_host),
@@ -42,7 +44,7 @@ def main() -> None:
     )
 
     threading.Thread(target=worker.run_forever, daemon=True).start()
-    serve(controller, settings.port, state_store)
+    serve(controller, settings.port, state_store, authenticator)
 
 
 if __name__ == "__main__":

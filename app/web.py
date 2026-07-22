@@ -12,6 +12,7 @@ from .dashboard import dashboard_state, render_dashboard
 class DashboardHttpServer(ThreadingHTTPServer):
     controller: Any
     state_store: Any
+    authenticator: Any
     event_interval_seconds: float
 
     def __init__(
@@ -19,16 +20,19 @@ class DashboardHttpServer(ThreadingHTTPServer):
         server_address,
         controller: Any,
         state_store: Any = None,
+        authenticator: Any = None,
         event_interval_seconds: float = 3,
     ) -> None:
         super().__init__(server_address, DashboardRequestHandler)
         self.controller = controller
         self.state_store = state_store
+        self.authenticator = authenticator
         self.event_interval_seconds = event_interval_seconds
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
+        parsed = urlparse(self.path)
         if self.path == "/healthz":
             self._send_json(200, {"ok": True})
             return
@@ -39,6 +43,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/metrics":
             self._send_metrics()
             return
+        if parsed.path == "/login":
+            self._login()
+            return
+        if parsed.path == "/oidc/callback":
+            self._oidc_callback(parsed)
+            return
+        if parsed.path == "/logout":
+            self._logout()
+            return
+        if not self._authenticated():
+            self._unauthorized()
+            return
         if self.path == "/api/state":
             self._send_json(200, dashboard_state(self._dashboard_server.controller))
             return
@@ -48,6 +64,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self._send_html(render_dashboard())
 
     def do_POST(self) -> None:
+        if not self._authenticated():
+            self._unauthorized()
+            return
         parsed = urlparse(self.path)
         if parsed.path == "/api/cname":
             try:
@@ -81,6 +100,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
 
     def do_DELETE(self) -> None:
+        if not self._authenticated():
+            self._unauthorized()
+            return
         parsed = urlparse(self.path)
         if parsed.path != "/api/stale-cname":
             self._send_json(404, {"error": "not found"})
@@ -197,6 +219,96 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(html.encode())
 
+    def _login(self) -> None:
+        authenticator = self._dashboard_server.authenticator
+        if authenticator is None or not authenticator.enabled:
+            self._redirect("/")
+            return
+        url, state_cookie = authenticator.authorization_url(self._callback_url())
+        self.send_response(302)
+        self.send_header("Location", url)
+        self._set_cookie("oidc_state", state_cookie, max_age=300, http_only=True)
+        self.end_headers()
+
+    def _oidc_callback(self, parsed) -> None:
+        authenticator = self._dashboard_server.authenticator
+        if authenticator is None or not authenticator.enabled:
+            self._redirect("/")
+            return
+        query = parse_qs(parsed.query)
+        try:
+            session = authenticator.callback(
+                query.get("code", [""])[0],
+                query.get("state", [""])[0],
+                self._cookie("oidc_state") or "",
+                self._callback_url(),
+            )
+        except Exception as error:
+            self._send_json(403, {"error": str(error)})
+            return
+        self.send_response(302)
+        self.send_header("Location", "/")
+        self._set_cookie("oidc_session", session, max_age=86400, http_only=True)
+        self._set_cookie("oidc_state", "", max_age=0, http_only=True)
+        self.end_headers()
+
+    def _logout(self) -> None:
+        self.send_response(302)
+        self.send_header("Location", "/")
+        self._set_cookie("oidc_session", "", max_age=0, http_only=True)
+        self.end_headers()
+
+    def _authenticated(self) -> bool:
+        authenticator = self._dashboard_server.authenticator
+        if authenticator is None or not authenticator.enabled:
+            return True
+        return authenticator.user(self._cookie("oidc_session")) is not None
+
+    def _unauthorized(self) -> None:
+        if self.path == "/" or self.path == "":
+            self._redirect("/login")
+            return
+        self._send_json(401, {"error": "authentication required"})
+
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.end_headers()
+
+    def _callback_url(self) -> str:
+        proto = self.headers.get("X-Forwarded-Proto", "http")
+        host = self.headers.get("X-Forwarded-Host", self.headers.get("Host", "localhost"))
+        return f"{proto}://{host}/oidc/callback"
+
+    def _cookie(self, name: str) -> str | None:
+        prefix = f"{name}="
+        for cookie in self.headers.get("Cookie", "").split(";"):
+            value = cookie.strip()
+            if value.startswith(prefix):
+                return value[len(prefix) :]
+        return None
+
+    def _set_cookie(
+        self,
+        name: str,
+        value: str,
+        max_age: int,
+        http_only: bool,
+    ) -> None:
+        authenticator = self._dashboard_server.authenticator
+        secure = bool(authenticator and authenticator.settings.cookie_secure)
+        parts = [
+            f"{name}={value}",
+            "Path=/",
+            "SameSite=Lax",
+            f"Max-Age={max_age}",
+        ]
+        if http_only:
+            parts.append("HttpOnly")
+        if secure:
+            parts.append("Secure")
+        self.send_header("Set-Cookie", "; ".join(parts))
+
     def log_message(self, format: str, *args: object) -> None:
         """Suppress the server's unstructured access log."""
         del format, args
@@ -206,8 +318,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         return cast(DashboardHttpServer, self.server)
 
 
-def serve(controller, port: int, state_store=None) -> None:
-    DashboardHttpServer(("", port), controller, state_store).serve_forever()
+def serve(controller, port: int, state_store=None, authenticator=None) -> None:
+    DashboardHttpServer(("", port), controller, state_store, authenticator).serve_forever()
 
 
 def _prometheus_metrics(metrics: dict[str, tuple[str, object]]) -> str:
