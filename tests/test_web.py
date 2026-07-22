@@ -130,10 +130,40 @@ class WebEndpointTests(unittest.TestCase):
             {"error": "hostname is not a stale target CNAME"},
         )
 
-    def request(self, server, method, path):
+    def test_add_cname_route_delegates_to_controller(self):
+        controller = FakeController()
+        server = DashboardHttpServer(("127.0.0.1", 0), controller)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            status, body = self.request(
+                server,
+                "POST",
+                "/api/cname",
+                json.dumps({"hostname": "manual.home.prettybaked.com"}).encode(),
+            )
+            invalid_status, invalid_body = self.request(
+                server,
+                "POST",
+                "/api/cname",
+                json.dumps({"hostname": "manual.example.net"}).encode(),
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"result": "created"})
+        self.assertEqual(controller.added_cnames, [("manual.home.prettybaked.com", None)])
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(json.loads(invalid_body), {"error": "outside allowed zones"})
+
+    def request(self, server, method, path, body=None):
         connection = http.client.HTTPConnection(*server.server_address, timeout=5)
         try:
-            connection.request(method, path)
+            headers = {"Content-Type": "application/json"} if body else {}
+            connection.request(method, path, body=body, headers=headers)
             response = connection.getresponse()
             body = response.read()
         finally:
@@ -149,18 +179,30 @@ class FakeController:
         self.ignored = ()
         self.claims = ()
         self.unifi_records = ()
+        self.default_target = "docker-swarm"
         self.localdomain = "local"
-        self.plan = type("Plan", (), {"desired": {}})()
+        self.always_show_delete = False
+        self.plan = type("Plan", (), {"desired": {}, "skipped_claims": ()})()
         self.dry_run = False
         self.last_error = None
         self.last_reconcile = 1
         self.deleted_stale = []
+        self.added_cnames = []
+
+    def target_domains(self):
+        return {"docker-swarm.local"}
 
     def delete_stale_target_cname(self, hostname):
         if hostname == "app.home.prettybaked.com":
             raise ValueError("hostname is not a stale target CNAME")
         self.deleted_stale.append(hostname)
         return "deleted"
+
+    def add_cname(self, hostname, target=None):
+        if not hostname.endswith(".home.prettybaked.com"):
+            raise ValueError("outside allowed zones")
+        self.added_cnames.append((hostname, target))
+        return "created"
 
 
 if __name__ == "__main__":

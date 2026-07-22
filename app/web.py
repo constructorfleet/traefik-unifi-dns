@@ -44,6 +44,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         self._send_html(render_dashboard())
 
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/cname":
+            self._send_json(404, {"error": "not found"})
+            return
+        try:
+            payload = self._read_json()
+            result = self._dashboard_server.controller.add_cname(
+                str(payload.get("hostname", "")),
+                str(payload.get("target", "")) or None,
+            )
+        except ValueError as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, {"result": result})
+
     def do_DELETE(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path != "/api/stale-cname":
@@ -66,6 +82,16 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(data)
+
+    def _read_json(self) -> dict[str, object]:
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length <= 0:
+            return {}
+        body = self.rfile.read(length)
+        parsed = json.loads(body)
+        if not isinstance(parsed, dict):
+            raise ValueError("request body must be a JSON object")
+        return parsed
 
     def _send_metrics(self) -> None:
         controller = self._dashboard_server.controller

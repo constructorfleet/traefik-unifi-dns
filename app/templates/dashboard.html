@@ -76,6 +76,7 @@
     }
     .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
     .filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;padding:16px}
+    .add-cname{display:grid;grid-template-columns:2fr 1fr auto;gap:12px;align-items:end;padding:16px}
     .field{display:grid;gap:6px}
     .field label{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
     input,select,button{
@@ -109,6 +110,7 @@
       .topbar{align-items:flex-start;flex-direction:column}
       .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
       .filters{grid-template-columns:1fr}
+      .add-cname{grid-template-columns:1fr}
       th,td{padding:10px 12px}
     }
   </style>
@@ -152,6 +154,23 @@
         </div>
         <button id="clear-filters" type="button">Clear</button>
       </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Add CNAME</h2>
+        <span id="add-cname-status" class="panel-note">Target defaults to docker-swarm.local</span>
+      </div>
+      <form id="add-cname-form" class="add-cname">
+        <div class="field">
+          <label for="add-cname-hostname">Hostname</label>
+          <input id="add-cname-hostname" name="hostname" type="text" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="add-cname-target">Target</label>
+          <input id="add-cname-target" name="target" type="text" autocomplete="off">
+        </div>
+        <button type="submit">Add</button>
+      </form>
     </section>
     <section class="panel">
       <div class="panel-head">
@@ -208,7 +227,7 @@
 
     function cell(column, row) {
       const td = document.createElement("td");
-      if (column.action === "delete-stale" && row.status === "stale") {
+      if (column.action === "delete-stale" && (row.status === "stale" || currentState.always_show_delete)) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "danger row-action";
@@ -361,6 +380,8 @@
       $("last-reconcile").textContent = state.last_reconcile ? new Date(state.last_reconcile * 1000).toLocaleString() : "Never";
       $("last-error").textContent = text(state.last_error);
       $("last-error").className = state.last_error ? "error-text" : "";
+      $("add-cname-target").placeholder = state.default_target;
+      $("add-cname-status").textContent = `Target defaults to ${state.default_target}.${state.cname_localdomain}`;
       renderFilteredState();
     }
 
@@ -370,7 +391,7 @@
     }
 
     async function deleteStaleCname(hostname) {
-      if (!confirm(`Delete stale CNAME ${hostname}?`)) return;
+      if (!confirm(`Delete CNAME ${hostname}?`)) return;
       const response = await fetch(`/api/stale-cname?hostname=${encodeURIComponent(hostname)}`, {
         method:"DELETE"
       });
@@ -379,6 +400,25 @@
         alert(body.error || "Delete failed");
         return;
       }
+      await fetchState();
+    }
+
+    async function addCname(hostname, target) {
+      const response = await fetch("/api/cname", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({hostname, target})
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        $("add-cname-status").textContent = body.error || "Add failed";
+        $("add-cname-status").className = "panel-note error-text";
+        return;
+      }
+      $("add-cname-status").className = "panel-note";
+      $("add-cname-status").textContent = body.result === "dry_run" ? "Dry run: CNAME not written" : "CNAME added";
+      $("add-cname-hostname").value = "";
+      $("add-cname-target").value = "";
       await fetchState();
     }
 
@@ -427,6 +467,10 @@
       filters.service = "";
       $("url-filter").value = "";
       renderFilteredState();
+    });
+    $("add-cname-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      addCname($("add-cname-hostname").value.trim(), $("add-cname-target").value.trim());
     });
     document.querySelectorAll(".tab").forEach((tab) => {
       tab.addEventListener("click", () => showPanel(tab.dataset.tab));

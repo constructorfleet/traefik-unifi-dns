@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from .ports import StaticDnsProvider
-from .traefik import RecordPlan, plan_records
+from .traefik import RecordPlan, normalize_host, plan_records, valid_hostname, valid_target
 
 LOG = logging.getLogger(__name__)
 
@@ -21,15 +21,22 @@ class Controller:
         localdomain: str = "local",
         dry_run: bool = False,
         require_enable_label: bool = True,
+        always_show_delete: bool = False,
     ) -> None:
         self.unifi, self.zones, self.ownership = unifi, zones, ownership
         self.default_target, self.localdomain = default_target, localdomain
         self.dry_run = dry_run
         self.require_enable_label = require_enable_label
+        self.always_show_delete = always_show_delete
         self.conflicts, self.last_error, self.last_reconcile = set(), None, None
         self.ignored, self.claims = (), ()
         self.unifi_records = ()
         self.plan = RecordPlan(desired={}, conflicts=set())
+
+    def target_domains(self) -> set[str]:
+        targets = {self.default_target, *self.plan.desired.values()}
+        targets.update(claim.target for claim in self.plan.skipped_claims)
+        return {f"{target}.{self.localdomain}" for target in targets}
 
     def reconcile(self, services: list[dict[str, Any]]) -> None:
         plan = plan_records(
@@ -146,12 +153,11 @@ class Controller:
             (candidate for candidate in self.unifi_records if candidate.get("key") == hostname),
             None,
         )
-        desired_targets = {f"{target}.{self.localdomain}" for target in self.plan.desired.values()}
         if (
             record is None
-            or str(record.get("type", "cname")).lower() != "cname"
-            or record.get("value") not in desired_targets
-            or hostname in self.plan.desired
+            or self._record_type(record) != "cname"
+            or record.get("value") not in self.target_domains()
+            or (hostname in self.plan.desired and not self.always_show_delete)
         ):
             raise ValueError("hostname is not a stale target CNAME")
         if self.dry_run:
@@ -167,6 +173,7 @@ class Controller:
             )
             return "dry_run"
         self.unifi.delete(hostname)
+        self.ownership.pop(hostname, None)
         self.unifi_records = tuple(
             candidate for candidate in self.unifi_records if candidate.get("key") != hostname
         )
@@ -181,3 +188,47 @@ class Controller:
             )
         )
         return "deleted"
+
+    def add_cname(self, hostname: str, target: str | None = None) -> str:
+        host = normalize_host(hostname.strip())
+        cname_target = (target or self.default_target).strip().lower()
+        if not valid_hostname(host) or not self._allowed(host):
+            raise ValueError("hostname is invalid or outside allowed zones")
+        if not valid_target(cname_target):
+            raise ValueError("target must be a lowercase DNS label")
+        fq_target = f"{cname_target}.{self.localdomain}"
+        if self.dry_run:
+            LOG.info(
+                json.dumps(
+                    {
+                        "hostname": host,
+                        "target": fq_target,
+                        "action": "add_cname",
+                        "result": "dry_run",
+                    }
+                )
+            )
+            return "dry_run"
+        self.unifi.create(host, fq_target)
+        self.ownership[host] = fq_target
+        self.unifi_records = (
+            *self.unifi_records,
+            {"key": host, "value": fq_target, "record_type": "CNAME"},
+        )
+        LOG.info(
+            json.dumps(
+                {
+                    "hostname": host,
+                    "target": fq_target,
+                    "action": "add_cname",
+                    "result": "ok",
+                }
+            )
+        )
+        return "created"
+
+    def _allowed(self, host: str) -> bool:
+        return any(host == zone or host.endswith("." + zone) for zone in self.zones)
+
+    def _record_type(self, record: dict[str, object]) -> str:
+        return str(record.get("record_type", record.get("type", "cname"))).lower()

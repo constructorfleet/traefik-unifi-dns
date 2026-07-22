@@ -16,6 +16,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("url-filter", html)
         self.assertIn('data-tab="target-cnames-panel"', html)
         self.assertIn("deleteStaleCname", html)
+        self.assertIn("addCname", html)
+        self.assertIn("add-cname-form", html)
         self.assertIn('action:"delete-stale"', html)
         self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
@@ -58,8 +60,8 @@ class DashboardTests(unittest.TestCase):
                     "hostname": "old.home",
                     "target": "edge.local",
                     "status": "stale",
-                    "stack": "",
-                    "service": "",
+                    "stack": "oldstack",
+                    "service": "old",
                 },
             ],
         )
@@ -82,7 +84,9 @@ class FakeController:
     dry_run = True
     last_error = None
     last_reconcile = 123.0
+    default_target = "docker-swarm"
     localdomain = "local"
+    always_show_delete = True
     unifi_records = (
         {"key": "app.home", "value": "edge.local", "type": "cname"},
         {"key": "old.home", "value": "edge.local", "type": "cname"},
@@ -92,6 +96,19 @@ class FakeController:
 
     class plan:
         desired = {"app.home": "edge", "old-reference.home": "edge"}
+        skipped_claims = (
+            SourceClaim(
+                host="old.home",
+                target="edge",
+                service="old",
+                stack="oldstack",
+                label="traefik.http.routers.old.rule",
+                kind="traefik",
+            ),
+        )
+
+    def target_domains(self):
+        return {"edge.local", "docker-swarm.local"}
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ class Settings:
     cname_localdomain: str
     dry_run: bool
     require_unifi_dns_enable: bool
+    always_show_delete: bool
     reconcile_interval_seconds: int
     port: int
     log_level: str
@@ -46,6 +47,10 @@ class Settings:
         require_unifi_dns_enable = _parse_bool(
             _env_value(values, "REQUIRE_UNIFI_DNS_ENABLE", "true"),
             "REQUIRE_UNIFI_DNS_ENABLE",
+        )
+        always_show_delete = _parse_bool(
+            _env_value(values, "ALWAYS_SHOW_DELETE", "false"),
+            "ALWAYS_SHOW_DELETE",
         )
         reconcile_interval_seconds = _parse_positive_int(
             _env_value(values, "RECONCILE_INTERVAL_SECONDS", "300"),
@@ -81,6 +86,7 @@ class Settings:
             cname_localdomain=cname_localdomain,
             dry_run=dry_run,
             require_unifi_dns_enable=require_unifi_dns_enable,
+            always_show_delete=always_show_delete,
             reconcile_interval_seconds=reconcile_interval_seconds,
             port=port,
             log_level=log_level,

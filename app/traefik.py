@@ -15,6 +15,7 @@ class RecordPlan:
     conflicts: set[str]
     ignored: tuple["IgnoredSource", ...] = ()
     claims: tuple["SourceClaim", ...] = ()
+    skipped_claims: tuple["SourceClaim", ...] = ()
     enabled_services: int = 0
     skipped_services: int = 0
     services_with_traefik_rules: int = 0
@@ -104,6 +105,7 @@ def plan_records(
     normalized_zones = [normalize_host(zone) for zone in zones]
     claims = defaultdict(set)
     source_claims = []
+    skipped_claims = []
     ignored = []
     enabled_services = 0
     skipped_services = 0
@@ -118,13 +120,21 @@ def plan_records(
         )
         if has_traefik_rules:
             services_with_traefik_rules += 1
-        if require_enable_label and labels.get("unifi-dns.enable", "").lower() != "true":
-            skipped_services += 1
-            continue
-        enabled_services += 1
         target = labels.get("unifi-dns.target", default_target).strip().lower()
         if not target or not valid_target(target):
             continue
+        if require_enable_label and not _unifi_dns_enabled(labels):
+            skipped_services += 1
+            skipped_claims.extend(
+                _service_traefik_claims(
+                    labels,
+                    service_name,
+                    stack_name,
+                    target,
+                )
+            )
+            continue
+        enabled_services += 1
         for key, source in labels.items():
             source_target = _source_label_target(key, target)
             if source_target is None:
@@ -169,6 +179,7 @@ def plan_records(
         conflicts=conflicts,
         ignored=tuple(ignored),
         claims=tuple(source_claims),
+        skipped_claims=tuple(skipped_claims),
         enabled_services=enabled_services,
         skipped_services=skipped_services,
         services_with_traefik_rules=services_with_traefik_rules,
@@ -209,6 +220,29 @@ def _source_label_target(label: str, default_target: str) -> str | None:
     if label.startswith(prefix):
         return label[len(prefix) :].strip().lower()
     return None
+
+
+def _unifi_dns_enabled(labels: dict[str, str]) -> bool:
+    return (
+        labels.get("unifi-dns.enable", "").lower() == "true"
+        or labels.get("unifi-dns.enabled", "").lower() == "true"
+    )
+
+
+def _service_traefik_claims(
+    labels: dict[str, str],
+    service_name: str,
+    stack_name: str,
+    target: str,
+) -> list[SourceClaim]:
+    claims = []
+    for key, rule in labels.items():
+        if key.startswith("traefik.http.routers.") and key.endswith(".rule"):
+            claims.extend(
+                SourceClaim(host, target, service_name, stack_name, key, "traefik")
+                for host in extract_hosts(rule)
+            )
+    return claims
 
 
 def _allowed(host: str, zones: list[str]) -> bool:

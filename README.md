@@ -50,7 +50,8 @@ Sources can come from literal Traefik `Host(...)` values or from a comma/whitesp
 does not append zones to short source names.
 
 Traefik labels alone are not enough. The controller only reads services with
-`unifi-dns.enable: "true"`, so `traefik.enable: "true"` without the UniFi DNS opt-in is skipped.
+`unifi-dns.enable: "true"` or `unifi-dns.enabled: "true"`, so `traefik.enable: "true"`
+without the UniFi DNS opt-in is skipped.
 
 Use `unifi-dns.source.<target>` when one service needs to claim hostnames for different CNAME
 targets:
@@ -80,6 +81,7 @@ conflict and no UniFi record is changed for that host.
 | `CNAME_LOCALDOMAIN` | no | `local` | Suffix appended to target names. |
 | `DRY_RUN` | no | `false` | Plan records and report state without mutating UniFi DNS or ownership state. |
 | `REQUIRE_UNIFI_DNS_ENABLE` | no | `true` | Require `unifi-dns.enable: "true"` before reading a service. Set to `false` to process matching Traefik rules without the opt-in label. `DRY_RUN` still prevents mutations. |
+| `ALWAYS_SHOW_DELETE` | no | `false` | Show the dashboard delete action for every target CNAME row instead of stale rows only. |
 | `RECONCILE_INTERVAL_SECONDS` | no | `300` | Maximum time between full reconciles while watching events. |
 | `PORT` | no | `8080` | HTTP UI and health endpoint port. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level. |
@@ -119,8 +121,9 @@ printf '%s' "$UNIFI_API_KEY" | docker secret create unifi_dns_traefik_api_key -
 
 The container exposes:
 
-- `/`: reactive status dashboard with a UniFi target-CNAME tab, owned records, source claims, ignored labels, conflicts, last error, and service/stack/URL filters.
+- `/`: reactive status dashboard with add-CNAME controls, a UniFi target-CNAME tab, owned records, source claims, ignored labels, conflicts, last error, and service/stack/URL filters.
 - `/api/state`: current dashboard state as JSON.
+- `/api/cname`: create a manual CNAME with a JSON `hostname` and optional target label.
 - `/events`: server-sent dashboard state events.
 - `/healthz`: process health.
 - `/readyz`: readiness after the first successful reconcile.

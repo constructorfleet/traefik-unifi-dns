@@ -87,6 +87,7 @@ class RuleExtractionTests(unittest.TestCase):
                     "Spec": {
                         "Name": "app",
                         "Labels": {
+                            "com.docker.stack.namespace": "nginx",
                             "traefik.enable": "true",
                             "traefik.http.routers.app.rule": ("Host(`app.home.prettybaked.com`)"),
                         },
@@ -101,6 +102,30 @@ class RuleExtractionTests(unittest.TestCase):
         self.assertEqual(plan.enabled_services, 0)
         self.assertEqual(plan.skipped_services, 1)
         self.assertEqual(plan.services_with_traefik_rules, 1)
+        self.assertEqual(
+            [(claim.host, claim.service, claim.stack) for claim in plan.skipped_claims],
+            [("app.home.prettybaked.com", "app", "nginx")],
+        )
+
+    def test_unifi_enabled_label_alias_opts_in_service(self):
+        plan = plan_records(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "unifi-dns.enabled": "true",
+                            "traefik.http.routers.app.rule": ("Host(`app.home.prettybaked.com`)"),
+                        },
+                    }
+                }
+            ],
+            ["home.prettybaked.com"],
+        )
+
+        self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+        self.assertEqual(plan.enabled_services, 1)
+        self.assertEqual(plan.skipped_services, 0)
 
     def test_bypass_unifi_opt_in_processes_traefik_rules(self):
         plan = plan_records(
@@ -449,6 +474,56 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(api.deleted, [])
         self.assertIn('"action": "delete_stale_target_cname"', "\n".join(logs.output))
         self.assertIn('"result": "dry_run"', "\n".join(logs.output))
+
+    def test_always_show_delete_allows_current_target_cname_delete(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "app.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "type": "cname",
+                }
+            ]
+        )
+        ownership = {"app.home.prettybaked.com": "docker-swarm.local"}
+        controller = Controller(
+            api,
+            ["home.prettybaked.com"],
+            ownership,
+            always_show_delete=True,
+        )
+        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+
+        result = controller.delete_stale_target_cname("app.home.prettybaked.com")
+
+        self.assertEqual(result, "deleted")
+        self.assertEqual(api.deleted, ["app.home.prettybaked.com"])
+        self.assertEqual(ownership, {})
+
+    def test_add_cname_defaults_to_default_target_and_owns_record(self):
+        api = FakeUnifi([])
+        ownership = {}
+        controller = Controller(api, ["home.prettybaked.com"], ownership)
+
+        result = controller.add_cname("manual.home.prettybaked.com")
+
+        self.assertEqual(result, "created")
+        self.assertEqual(
+            api.created,
+            [("manual.home.prettybaked.com", "docker-swarm.local")],
+        )
+        self.assertEqual(ownership, {"manual.home.prettybaked.com": "docker-swarm.local"})
+
+    def test_add_cname_rejects_outside_zone_and_respects_dry_run(self):
+        api = FakeUnifi([])
+        controller = Controller(api, ["home.prettybaked.com"], {}, dry_run=True)
+
+        with self.assertRaises(ValueError):
+            controller.add_cname("manual.example.net")
+        result = controller.add_cname("manual.home.prettybaked.com", "edge")
+
+        self.assertEqual(result, "dry_run")
+        self.assertEqual(api.created, [])
 
     def test_preserves_unowned_records_and_api_failure(self):
         api = FakeUnifi(

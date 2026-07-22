@@ -15,6 +15,7 @@ class SettingsTests(unittest.TestCase):
                 "CNAME_LOCALDOMAIN": "Lan.",
                 "DRY_RUN": "yes",
                 "REQUIRE_UNIFI_DNS_ENABLE": "false",
+                "ALWAYS_SHOW_DELETE": "true",
                 "UNIFI_VERIFY_SSL": "false",
                 "RECONCILE_INTERVAL_SECONDS": "60",
                 "PORT": "8081",
@@ -30,6 +31,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.cname_localdomain, "lan")
         self.assertTrue(settings.dry_run)
         self.assertFalse(settings.require_unifi_dns_enable)
+        self.assertTrue(settings.always_show_delete)
         self.assertFalse(settings.unifi_verify_ssl)
         self.assertEqual(settings.log_level, "DEBUG")
 
@@ -48,6 +50,7 @@ class SettingsTests(unittest.TestCase):
         invalid_envs = [
             {"DRY_RUN": "maybe"},
             {"UNIFI_VERIFY_SSL": "sometimes"},
+            {"ALWAYS_SHOW_DELETE": "occasionally"},
             {"RECONCILE_INTERVAL_SECONDS": "0"},
             {"RECONCILE_INTERVAL_SECONDS": "abc"},
             {"PORT": "0"},
