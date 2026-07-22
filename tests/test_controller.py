@@ -525,6 +525,63 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(result, "dry_run")
         self.assertEqual(api.created, [])
 
+    def test_edit_cname_metadata_marks_target_cname_manual(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "manual.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "record_type": "CNAME",
+                }
+            ]
+        )
+        metadata = {}
+        controller = Controller(
+            api,
+            ["home.prettybaked.com"],
+            {},
+            metadata,
+        )
+        controller.reconcile([])
+
+        result = controller.edit_cname_metadata(
+            "manual.home.prettybaked.com",
+            "media",
+            "requests",
+        )
+
+        self.assertEqual(result, "saved")
+        self.assertEqual(
+            metadata,
+            {"manual.home.prettybaked.com": {"stack": "media", "service": "requests"}},
+        )
+
+    def test_edit_cname_metadata_clears_empty_values_and_rejects_non_target(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "manual.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "record_type": "CNAME",
+                }
+            ]
+        )
+        metadata = {"manual.home.prettybaked.com": {"stack": "media", "service": "requests"}}
+        controller = Controller(
+            api,
+            ["home.prettybaked.com"],
+            {},
+            metadata,
+        )
+        controller.reconcile([])
+
+        result = controller.edit_cname_metadata("manual.home.prettybaked.com", "", "")
+        with self.assertRaises(ValueError):
+            controller.edit_cname_metadata("missing.home.prettybaked.com", "stack", "service")
+
+        self.assertEqual(result, "cleared")
+        self.assertEqual(metadata, {})
+
     def test_preserves_unowned_records_and_api_failure(self):
         api = FakeUnifi(
             [{"key": "manual.home.prettybaked.com", "value": "manual.local"}], fail_create=True

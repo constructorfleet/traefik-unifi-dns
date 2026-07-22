@@ -7,10 +7,11 @@ from app.runtime import ReconcileWorker
 
 class ReconcileWorkerTests(unittest.TestCase):
     def test_reconcile_once_logs_fetched_service_count(self):
+        state_store = FakeStateStore()
         worker = ReconcileWorker(
             controller=FakeController(),
             docker=FakeDocker([{"ID": "service-1"}]),
-            state_store=FakeStateStore(),
+            state_store=state_store,
             reconcile_interval_seconds=300,
         )
 
@@ -19,6 +20,10 @@ class ReconcileWorkerTests(unittest.TestCase):
 
         self.assertIn('"action": "docker_services"', "\n".join(logs.output))
         self.assertIn('"services": 1', "\n".join(logs.output))
+        self.assertEqual(
+            state_store.manual_metadata,
+            {"old.home": {"stack": "media", "service": "requests"}},
+        )
 
     def test_wait_for_service_events_treats_stream_timeout_as_reconnect(self):
         response = FakeEventResponse(requests.exceptions.ConnectionError("Read timed out."))
@@ -42,6 +47,7 @@ class ReconcileWorkerTests(unittest.TestCase):
 
 class FakeController:
     ownership = {}
+    manual_metadata = {"old.home": {"stack": "media", "service": "requests"}}
 
     def reconcile(self, services):
         self.services = services
@@ -78,8 +84,9 @@ class FakeEventResponse:
 
 
 class FakeStateStore:
-    def save(self, ownership):
+    def save(self, ownership, manual_metadata=None):
         self.ownership = ownership
+        self.manual_metadata = manual_metadata
 
 
 if __name__ == "__main__":

@@ -92,7 +92,9 @@
     button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
     button:hover{filter:brightness(.96)}
     button.danger{background:var(--warn);border-color:var(--warn)}
+    button.secondary{background:#fff;border-color:var(--line);color:var(--text)}
     .row-action{width:auto;min-height:30px;padding:5px 9px;font-size:12px}
+    .actions{display:flex;gap:8px;align-items:center}
     .panel{overflow:hidden}
     .table-panel[hidden]{display:none}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
@@ -227,6 +229,26 @@
 
     function cell(column, row) {
       const td = document.createElement("td");
+      if (column.action === "record-actions") {
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "secondary row-action";
+        edit.textContent = "Edit";
+        edit.addEventListener("click", () => editCnameMetadata(row));
+        actions.append(edit);
+        if (row.status === "stale" || currentState.always_show_delete) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "danger row-action";
+          button.textContent = "Delete";
+          button.addEventListener("click", () => deleteStaleCname(row.hostname));
+          actions.append(button);
+        }
+        td.append(actions);
+        return td;
+      }
       if (column.action === "delete-stale" && (row.status === "stale" || currentState.always_show_delete)) {
         const button = document.createElement("button");
         button.type = "button";
@@ -347,7 +369,7 @@
         {key:"status", label:"Status"},
         {key:"stack", label:"Stack"},
         {key:"service", label:"Service"},
-        {key:"actions", label:"Actions", action:"delete-stale"}
+        {key:"actions", label:"Actions", action:"record-actions"}
       ], targetCnames, "No UniFi CNAMEs point at current DNS targets");
       renderTable("owned-records", [
         {key:"hostname", label:"Hostname"},
@@ -419,6 +441,24 @@
       $("add-cname-status").textContent = body.result === "dry_run" ? "Dry run: CNAME not written" : "CNAME added";
       $("add-cname-hostname").value = "";
       $("add-cname-target").value = "";
+      await fetchState();
+    }
+
+    async function editCnameMetadata(row) {
+      const stack = prompt("Stack", row.stack || "");
+      if (stack === null) return;
+      const service = prompt("Service", row.service || "");
+      if (service === null) return;
+      const response = await fetch("/api/cname-metadata", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({hostname:row.hostname, stack, service})
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        alert(body.error || "Edit failed");
+        return;
+      }
       await fetchState();
     }
 

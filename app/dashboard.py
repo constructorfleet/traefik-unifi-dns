@@ -8,12 +8,14 @@ DASHBOARD_TEMPLATE = (Path(__file__).parent / "templates" / "dashboard.html").re
 def dashboard_state(controller) -> dict[str, object]:
     claims_by_host = {claim.host: claim for claim in controller.claims}
     skipped_claims_by_host = {claim.host: claim for claim in controller.plan.skipped_claims}
+    manual_metadata = controller.manual_metadata
     target_domains = controller.target_domains()
     unifi_target_records = [
         _unifi_target_record(
             record,
             claims_by_host,
             skipped_claims_by_host,
+            manual_metadata,
             controller.plan.desired,
         )
         for record in controller.unifi_records
@@ -40,8 +42,10 @@ def dashboard_state(controller) -> dict[str, object]:
             {
                 "hostname": host,
                 "target": target,
-                "service": claims_by_host[host].service if host in claims_by_host else "",
-                "stack": claims_by_host[host].stack if host in claims_by_host else "",
+                "service": _metadata_value(manual_metadata, host, "service")
+                or (claims_by_host[host].service if host in claims_by_host else ""),
+                "stack": _metadata_value(manual_metadata, host, "stack")
+                or (claims_by_host[host].stack if host in claims_by_host else ""),
             }
             for host, target in sorted(controller.ownership.items())
         ],
@@ -80,14 +84,26 @@ def _is_cname(record: dict[str, object]) -> bool:
     return str(record_type).lower() == "cname"
 
 
-def _unifi_target_record(record, claims_by_host, skipped_claims_by_host, desired):
+def _unifi_target_record(
+    record,
+    claims_by_host,
+    skipped_claims_by_host,
+    manual_metadata,
+    desired,
+):
     hostname = record.get("key", "")
     claim = claims_by_host.get(hostname) or skipped_claims_by_host.get(hostname)
-    status = "current" if hostname in desired else "stale"
+    manual = manual_metadata.get(hostname, {})
+    has_manual_metadata = bool(manual.get("stack") or manual.get("service"))
+    status = "manual" if has_manual_metadata else ("current" if hostname in desired else "stale")
     return {
         "hostname": hostname,
         "target": record.get("value", ""),
         "status": status,
-        "stack": claim.stack if claim else "",
-        "service": claim.service if claim else "",
+        "stack": manual.get("stack", "") or (claim.stack if claim else ""),
+        "service": manual.get("service", "") or (claim.service if claim else ""),
     }
+
+
+def _metadata_value(metadata, host, key) -> str:
+    return metadata.get(host, {}).get(key, "")

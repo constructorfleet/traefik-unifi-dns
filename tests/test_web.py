@@ -132,7 +132,8 @@ class WebEndpointTests(unittest.TestCase):
 
     def test_add_cname_route_delegates_to_controller(self):
         controller = FakeController()
-        server = DashboardHttpServer(("127.0.0.1", 0), controller)
+        state_store = FakeStateStore()
+        server = DashboardHttpServer(("127.0.0.1", 0), controller, state_store)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
@@ -156,8 +157,41 @@ class WebEndpointTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body), {"result": "created"})
         self.assertEqual(controller.added_cnames, [("manual.home.prettybaked.com", None)])
+        self.assertEqual(state_store.saved[-1][0], controller.ownership)
         self.assertEqual(invalid_status, 400)
         self.assertEqual(json.loads(invalid_body), {"error": "outside allowed zones"})
+
+    def test_edit_cname_metadata_route_delegates_and_persists(self):
+        controller = FakeController()
+        state_store = FakeStateStore()
+        server = DashboardHttpServer(("127.0.0.1", 0), controller, state_store)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            status, body = self.request(
+                server,
+                "POST",
+                "/api/cname-metadata",
+                json.dumps(
+                    {
+                        "hostname": "old.home.prettybaked.com",
+                        "stack": "media",
+                        "service": "requests",
+                    }
+                ).encode(),
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"result": "saved"})
+        self.assertEqual(
+            controller.edited_metadata,
+            [("old.home.prettybaked.com", "media", "requests")],
+        )
+        self.assertEqual(state_store.saved[-1][1], controller.manual_metadata)
 
     def request(self, server, method, path, body=None):
         connection = http.client.HTTPConnection(*server.server_address, timeout=5)
@@ -183,11 +217,13 @@ class FakeController:
         self.localdomain = "local"
         self.always_show_delete = False
         self.plan = type("Plan", (), {"desired": {}, "skipped_claims": ()})()
+        self.manual_metadata = {}
         self.dry_run = False
         self.last_error = None
         self.last_reconcile = 1
         self.deleted_stale = []
         self.added_cnames = []
+        self.edited_metadata = []
 
     def target_domains(self):
         return {"docker-swarm.local"}
@@ -203,6 +239,19 @@ class FakeController:
             raise ValueError("outside allowed zones")
         self.added_cnames.append((hostname, target))
         return "created"
+
+    def edit_cname_metadata(self, hostname, stack, service):
+        self.manual_metadata[hostname] = {"stack": stack, "service": service}
+        self.edited_metadata.append((hostname, stack, service))
+        return "saved"
+
+
+class FakeStateStore:
+    def __init__(self):
+        self.saved = []
+
+    def save(self, ownership, manual_metadata=None):
+        self.saved.append((dict(ownership), dict(manual_metadata or {})))
 
 
 if __name__ == "__main__":

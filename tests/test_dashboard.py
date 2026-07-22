@@ -17,8 +17,9 @@ class DashboardTests(unittest.TestCase):
         self.assertIn('data-tab="target-cnames-panel"', html)
         self.assertIn("deleteStaleCname", html)
         self.assertIn("addCname", html)
+        self.assertIn("editCnameMetadata", html)
         self.assertIn("add-cname-form", html)
-        self.assertIn('action:"delete-stale"', html)
+        self.assertIn('action:"record-actions"', html)
         self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)
@@ -45,7 +46,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(state["claims"][0]["stack"], "nginx")
         self.assertEqual(state["claims"][0]["type"], "traefik")
         self.assertEqual(state["counts"]["unifi_target_records"], 2)
-        self.assertEqual(state["counts"]["stale_unifi_target_records"], 1)
+        self.assertEqual(state["counts"]["stale_unifi_target_records"], 0)
         self.assertEqual(
             state["unifi_target_records"],
             [
@@ -59,9 +60,9 @@ class DashboardTests(unittest.TestCase):
                 {
                     "hostname": "old.home",
                     "target": "edge.local",
-                    "status": "stale",
-                    "stack": "oldstack",
-                    "service": "old",
+                    "status": "manual",
+                    "stack": "manualstack",
+                    "service": "manualsvc",
                 },
             ],
         )
@@ -87,6 +88,7 @@ class FakeController:
     default_target = "docker-swarm"
     localdomain = "local"
     always_show_delete = True
+    manual_metadata = {"old.home": {"stack": "manualstack", "service": "manualsvc"}}
     unifi_records = (
         {"key": "app.home", "value": "edge.local", "type": "cname"},
         {"key": "old.home", "value": "edge.local", "type": "cname"},

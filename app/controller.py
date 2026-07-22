@@ -17,6 +17,7 @@ class Controller:
         unifi: StaticDnsProvider,
         zones: tuple[str, ...] | list[str],
         ownership: dict[str, str],
+        manual_metadata: dict[str, dict[str, str]] | None = None,
         default_target: str = "docker-swarm",
         localdomain: str = "local",
         dry_run: bool = False,
@@ -24,6 +25,7 @@ class Controller:
         always_show_delete: bool = False,
     ) -> None:
         self.unifi, self.zones, self.ownership = unifi, zones, ownership
+        self.manual_metadata = manual_metadata if manual_metadata is not None else {}
         self.default_target, self.localdomain = default_target, localdomain
         self.dry_run = dry_run
         self.require_enable_label = require_enable_label
@@ -227,8 +229,45 @@ class Controller:
         )
         return "created"
 
+    def edit_cname_metadata(self, hostname: str, stack: str, service: str) -> str:
+        host = normalize_host(hostname.strip())
+        record = self._target_cname_record(host)
+        if record is None:
+            raise ValueError("hostname is not a target CNAME")
+        metadata = {"stack": stack.strip(), "service": service.strip()}
+        if metadata["stack"] or metadata["service"]:
+            self.manual_metadata[host] = metadata
+            result = "saved"
+        else:
+            self.manual_metadata.pop(host, None)
+            result = "cleared"
+        LOG.info(
+            json.dumps(
+                {
+                    "hostname": host,
+                    "stack": metadata["stack"],
+                    "service": metadata["service"],
+                    "action": "edit_cname_metadata",
+                    "result": result,
+                }
+            )
+        )
+        return result
+
     def _allowed(self, host: str) -> bool:
         return any(host == zone or host.endswith("." + zone) for zone in self.zones)
 
     def _record_type(self, record: dict[str, object]) -> str:
         return str(record.get("record_type", record.get("type", "cname"))).lower()
+
+    def _target_cname_record(self, host: str) -> dict[str, object] | None:
+        return next(
+            (
+                record
+                for record in self.unifi_records
+                if record.get("key") == host
+                and self._record_type(record) == "cname"
+                and record.get("value") in self.target_domains()
+            ),
+            None,
+        )

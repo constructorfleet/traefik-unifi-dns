@@ -46,12 +46,13 @@ class ReconcileWorker:
         services = self.docker.list_services()
         LOG.info(json.dumps({"action": "docker_services", "services": len(services)}))
         self.controller.reconcile(services)
-        self.state_store.save(self.controller.ownership)
+        self.state_store.save(self.controller.ownership, self.controller.manual_metadata)
         LOG.info(
             json.dumps(
                 {
                     "action": "state_save",
                     "owned_records": len(self.controller.ownership),
+                    "manual_metadata": len(self.controller.manual_metadata),
                 }
             )
         )

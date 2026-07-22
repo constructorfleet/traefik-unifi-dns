@@ -96,6 +96,9 @@ In dry-run mode, create/update/delete candidates are logged with `"result": "dry
 ownership state file is not updated, because dry-run records were not actually created and should
 not become eligible for later deletion as controller-owned records.
 
+Manual stack/service annotations from the dashboard are stored in the same state file as ownership
+data and are restored after restarts.
+
 ## Deployment
 
 For local development:
@@ -124,6 +127,7 @@ The container exposes:
 - `/`: reactive status dashboard with add-CNAME controls, a UniFi target-CNAME tab, owned records, source claims, ignored labels, conflicts, last error, and service/stack/URL filters.
 - `/api/state`: current dashboard state as JSON.
 - `/api/cname`: create a manual CNAME with a JSON `hostname` and optional target label.
+- `/api/cname-metadata`: persist manual stack/service metadata for a target CNAME.
 - `/events`: server-sent dashboard state events.
 - `/healthz`: process health.
 - `/readyz`: readiness after the first successful reconcile.

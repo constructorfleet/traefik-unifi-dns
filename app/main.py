@@ -19,11 +19,12 @@ def build_controller(settings: Settings, state_store: JsonStateStore) -> Control
         ),
         settings.allowed_zones,
         state_store.load(),
-        settings.default_target,
-        settings.cname_localdomain,
-        settings.dry_run,
-        settings.require_unifi_dns_enable,
-        settings.always_show_delete,
+        state_store.load_manual_metadata(),
+        default_target=settings.default_target,
+        localdomain=settings.cname_localdomain,
+        dry_run=settings.dry_run,
+        require_enable_label=settings.require_unifi_dns_enable,
+        always_show_delete=settings.always_show_delete,
     )
 
 
@@ -41,7 +42,7 @@ def main() -> None:
     )
 
     threading.Thread(target=worker.run_forever, daemon=True).start()
-    serve(controller, settings.port)
+    serve(controller, settings.port, state_store)
 
 
 if __name__ == "__main__":

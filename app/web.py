@@ -11,16 +11,19 @@ from .dashboard import dashboard_state, render_dashboard
 
 class DashboardHttpServer(ThreadingHTTPServer):
     controller: Any
+    state_store: Any
     event_interval_seconds: float
 
     def __init__(
         self,
         server_address,
         controller: Any,
+        state_store: Any = None,
         event_interval_seconds: float = 3,
     ) -> None:
         super().__init__(server_address, DashboardRequestHandler)
         self.controller = controller
+        self.state_store = state_store
         self.event_interval_seconds = event_interval_seconds
 
 
@@ -46,19 +49,36 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path != "/api/cname":
+        if parsed.path == "/api/cname":
+            try:
+                payload = self._read_json()
+                result = self._dashboard_server.controller.add_cname(
+                    str(payload.get("hostname", "")),
+                    str(payload.get("target", "")) or None,
+                )
+                self._save_state()
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            self._send_json(200, {"result": result})
+            return
+        if parsed.path == "/api/cname-metadata":
+            try:
+                payload = self._read_json()
+                result = self._dashboard_server.controller.edit_cname_metadata(
+                    str(payload.get("hostname", "")),
+                    str(payload.get("stack", "")),
+                    str(payload.get("service", "")),
+                )
+                self._save_state()
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            self._send_json(200, {"result": result})
+            return
+        else:
             self._send_json(404, {"error": "not found"})
             return
-        try:
-            payload = self._read_json()
-            result = self._dashboard_server.controller.add_cname(
-                str(payload.get("hostname", "")),
-                str(payload.get("target", "")) or None,
-            )
-        except ValueError as error:
-            self._send_json(400, {"error": str(error)})
-            return
-        self._send_json(200, {"result": result})
 
     def do_DELETE(self) -> None:
         parsed = urlparse(self.path)
@@ -71,6 +91,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         try:
             result = self._dashboard_server.controller.delete_stale_target_cname(hostname)
+            self._save_state()
         except ValueError as error:
             self._send_json(409, {"error": str(error)})
             return
@@ -146,6 +167,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(metrics.encode())
 
+    def _save_state(self) -> None:
+        state_store = self._dashboard_server.state_store
+        if state_store is None:
+            return
+        controller = self._dashboard_server.controller
+        state_store.save(controller.ownership, controller.manual_metadata)
+
     def _send_events(self) -> None:
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -178,8 +206,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         return cast(DashboardHttpServer, self.server)
 
 
-def serve(controller, port: int) -> None:
-    DashboardHttpServer(("", port), controller).serve_forever()
+def serve(controller, port: int, state_store=None) -> None:
+    DashboardHttpServer(("", port), controller, state_store).serve_forever()
 
 
 def _prometheus_metrics(metrics: dict[str, tuple[str, object]]) -> str:
