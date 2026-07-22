@@ -49,6 +49,17 @@ Sources can come from literal Traefik `Host(...)` values or from a comma/whitesp
 `ALLOWED_ZONES` are ignored. `ALLOWED_ZONES` is an allowlist for fully qualified hostnames; it
 does not append zones to short source names.
 
+Use `unifi-dns.source.<target>` when one service needs to claim hostnames for different CNAME
+targets:
+
+```yaml
+deploy:
+  labels:
+    unifi-dns.enable: "true"
+    unifi-dns.source.edge: "app.home.example.com"
+    unifi-dns.source.media: "media.home.example.com"
+```
+
 If two services claim the same hostname with different targets, the hostname is treated as a
 conflict and no UniFi record is changed for that host.
 
