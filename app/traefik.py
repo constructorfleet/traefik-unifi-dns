@@ -2,10 +2,17 @@
 
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any
 
 HOST_CALL = re.compile(r"(?<![A-Za-z])Host\(\s*((?:`[^`]+`\s*,?\s*)+)\)")
 LITERAL = re.compile(r"`([^`]+)`")
+
+
+@dataclass(frozen=True)
+class RecordPlan:
+    desired: dict[str, str]
+    conflicts: set[str]
 
 
 def normalize_host(host: str) -> str:
@@ -29,11 +36,19 @@ def desired_records(
     services: list[dict[str, Any]],
     zones: tuple[str, ...] | list[str],
     default_target: str = "docker-swarm",
-    localdomain: str = "local",
     with_conflicts: bool = False,
 ):
     """Produce desired hostname -> CNAME target, refusing ambiguous ownership."""
-    del localdomain
+    plan = plan_records(services, zones, default_target)
+    return (plan.desired, plan.conflicts) if with_conflicts else plan.desired
+
+
+def plan_records(
+    services: list[dict[str, Any]],
+    zones: tuple[str, ...] | list[str],
+    default_target: str = "docker-swarm",
+) -> RecordPlan:
+    """Plan desired hostname ownership from opted-in Traefik service labels."""
     normalized_zones = [normalize_host(zone) for zone in zones]
     claims = defaultdict(set)
     for service in services:
@@ -50,7 +65,7 @@ def desired_records(
                         claims[host].add(target)
     conflicts = {host for host, targets in claims.items() if len(targets) > 1}
     desired = {host: next(iter(targets)) for host, targets in claims.items() if len(targets) == 1}
-    return (desired, conflicts) if with_conflicts else desired
+    return RecordPlan(desired=desired, conflicts=conflicts)
 
 
 def _allowed(host: str, zones: list[str]) -> bool:

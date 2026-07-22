@@ -16,6 +16,7 @@ through labels instead of hand-maintained DNS entries.
 The service is split by responsibility:
 
 - `app/controller.py`: UniFi reconciliation orchestration.
+- `app/ports.py`: protocols for replaceable infrastructure adapters.
 - `app/traefik.py`: Traefik label parsing and desired-record planning.
 - `app/docker_client.py`: Docker Engine API adapter. Supports Unix sockets and HTTP socket proxies.
 - `app/unifi_client.py`: UniFi Network static DNS API adapter.

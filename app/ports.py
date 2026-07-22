@@ -1,0 +1,13 @@
+"""Application ports used by domain services."""
+
+from typing import Any, Protocol
+
+
+class StaticDnsProvider(Protocol):
+    def list(self) -> list[dict[str, Any]]: ...
+
+    def create(self, host: str, target: str) -> None: ...
+
+    def update(self, host: str, target: str) -> None: ...
+
+    def delete(self, host: str) -> None: ...

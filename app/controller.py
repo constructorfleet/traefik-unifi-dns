@@ -3,24 +3,32 @@
 import json
 import logging
 import time
+from typing import Any
 
-from .traefik import desired_records
+from .ports import StaticDnsProvider
+from .traefik import plan_records
 
 LOG = logging.getLogger(__name__)
 
 
 class Controller:
-    def __init__(self, unifi, zones, ownership, default_target="docker-swarm", localdomain="local"):
+    def __init__(
+        self,
+        unifi: StaticDnsProvider,
+        zones: tuple[str, ...] | list[str],
+        ownership: dict[str, str],
+        default_target: str = "docker-swarm",
+        localdomain: str = "local",
+    ) -> None:
         self.unifi, self.zones, self.ownership = unifi, zones, ownership
         self.default_target, self.localdomain = default_target, localdomain
         self.conflicts, self.last_error, self.last_reconcile = set(), None, None
 
-    def reconcile(self, services):
-        desired, self.conflicts = desired_records(
-            services, self.zones, self.default_target, self.localdomain, True
-        )
+    def reconcile(self, services: list[dict[str, Any]]) -> None:
+        plan = plan_records(services, self.zones, self.default_target)
+        self.conflicts = plan.conflicts
         current = {record["key"]: record for record in self.unifi.list()}
-        for host, target in desired.items():
+        for host, target in plan.desired.items():
             fq_target = target + "." + self.localdomain
             record = current.get(host)
             if record is None:
@@ -40,7 +48,7 @@ class Controller:
                     )
                 )
         for host in list(self.ownership):
-            if host not in desired and host not in self.conflicts:
+            if host not in plan.desired and host not in self.conflicts:
                 if host in current:
                     self.unifi.delete(host)
                 del self.ownership[host]

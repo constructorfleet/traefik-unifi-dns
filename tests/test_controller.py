@@ -1,7 +1,7 @@
 import unittest
 
 from app.controller import Controller
-from app.traefik import desired_records, extract_hosts, normalize_host
+from app.traefik import desired_records, extract_hosts, normalize_host, plan_records
 
 
 class RuleExtractionTests(unittest.TestCase):
@@ -55,6 +55,19 @@ class RuleExtractionTests(unittest.TestCase):
         )
         self.assertEqual(desired, {})
         self.assertEqual(conflicts, {"same.home.prettybaked.com"})
+
+    def test_record_plan_exposes_desired_records_and_conflicts(self):
+        plan = plan_records(
+            [
+                service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm"),
+                service("dup-a", "Host(`dup.home.prettybaked.com`)", "one"),
+                service("dup-b", "Host(`dup.home.prettybaked.com`)", "two"),
+            ],
+            ["home.prettybaked.com"],
+        )
+
+        self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+        self.assertEqual(plan.conflicts, {"dup.home.prettybaked.com"})
 
 
 class ReconcileTests(unittest.TestCase):
