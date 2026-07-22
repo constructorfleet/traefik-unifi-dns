@@ -7,7 +7,7 @@ from string import Template
 DASHBOARD_TEMPLATE = Template((Path(__file__).parent / "templates" / "dashboard.html").read_text())
 
 
-def render_dashboard(ownership, conflicts, last_error, ignored=(), claims=()):
+def render_dashboard(ownership, conflicts, last_error, ignored=(), claims=(), dry_run=False):
     rows = "".join(
         f"<tr><td>{escape(host)}</td><td>{escape(target)}</td></tr>"
         for host, target in sorted(ownership.items())
@@ -45,6 +45,7 @@ def render_dashboard(ownership, conflicts, last_error, ignored=(), claims=()):
 
     return DASHBOARD_TEMPLATE.substitute(
         conflicts=conflict_text,
+        dry_run="enabled" if dry_run else "disabled",
         error=error_text,
         ignored_rows=ignored_rows,
         claim_rows=claim_rows,

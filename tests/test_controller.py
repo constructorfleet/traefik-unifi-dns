@@ -250,6 +250,20 @@ class ReconcileTests(unittest.TestCase):
             [("app", "bad_host.home.prettybaked.com", "invalid hostname")],
         )
 
+    def test_dry_run_skips_unifi_mutations_and_ownership_updates(self):
+        api = FakeUnifi([])
+        ownership = {}
+        controller = Controller(api, ["home.prettybaked.com"], ownership, dry_run=True)
+
+        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+
+        self.assertEqual(api.created, [])
+        self.assertEqual(api.updated, [])
+        self.assertEqual(api.deleted, [])
+        self.assertEqual(ownership, {})
+        self.assertEqual(controller.ownership, {})
+        self.assertEqual(controller.plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+
     def test_preserves_unowned_records_and_api_failure(self):
         api = FakeUnifi(
             [{"key": "manual.home.prettybaked.com", "value": "manual.local"}], fail_create=True

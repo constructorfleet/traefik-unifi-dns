@@ -31,6 +31,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.server.controller.last_error,
                 self.server.controller.ignored,
                 self.server.controller.claims,
+                self.server.controller.dry_run,
             )
         )
 
@@ -46,6 +47,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         metrics = (
             f"unifi_dns_traefik_conflicts {len(controller.conflicts)}\n"
             f"unifi_dns_traefik_owned_records {len(controller.ownership)}\n"
+            f"unifi_dns_traefik_dry_run {int(controller.dry_run)}\n"
         )
         self.send_response(200)
         self.end_headers()

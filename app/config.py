@@ -17,6 +17,7 @@ class Settings:
     unifi_api_key_file: Path
     default_target: str
     cname_localdomain: str
+    dry_run: bool
     reconcile_interval_seconds: int
     port: int
     log_level: str
@@ -42,6 +43,7 @@ class Settings:
             unifi_api_key_file=Path(values.get("UNIFI_API_KEY_FILE", "/run/secrets/unifi_api_key")),
             default_target=values.get("DEFAULT_TARGET", "docker-swarm").strip(),
             cname_localdomain=values.get("CNAME_LOCALDOMAIN", "local").strip(),
+            dry_run=values.get("DRY_RUN", "").strip().lower() in {"1", "true", "yes", "on"},
             reconcile_interval_seconds=int(values.get("RECONCILE_INTERVAL_SECONDS", "300")),
             port=int(values.get("PORT", "8080")),
             log_level=values.get("LOG_LEVEL", "INFO").strip(),

@@ -63,6 +63,7 @@ conflict and no UniFi record is changed for that host.
 | `STATE_PATH` | no | `/state/ownership.json` | Persistent ownership-state file. |
 | `DEFAULT_TARGET` | no | `docker-swarm` | CNAME target label fallback. |
 | `CNAME_LOCALDOMAIN` | no | `local` | Suffix appended to target names. |
+| `DRY_RUN` | no | `false` | Plan records and report state without mutating UniFi DNS or ownership state. |
 | `RECONCILE_INTERVAL_SECONDS` | no | `300` | Maximum time between full reconciles while watching events. |
 | `PORT` | no | `8080` | HTTP UI and health endpoint port. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level. |

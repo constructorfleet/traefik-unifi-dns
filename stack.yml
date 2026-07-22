@@ -7,6 +7,7 @@ services:
       ALLOWED_ZONES: ${ALLOWED_ZONES:?set ALLOWED_ZONES}
       DEFAULT_TARGET: ${DEFAULT_TARGET:-docker-swarm}
       CNAME_LOCALDOMAIN: ${CNAME_LOCALDOMAIN:-local}
+      DRY_RUN: ${DRY_RUN:-false}
       RECONCILE_INTERVAL_SECONDS: ${RECONCILE_INTERVAL_SECONDS:-300}
     secrets:
       - source: unifi_dns_traefik_api_key

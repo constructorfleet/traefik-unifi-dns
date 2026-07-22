@@ -17,6 +17,7 @@ def build_controller(settings: Settings, state_store: JsonStateStore) -> Control
         state_store.load(),
         settings.default_target,
         settings.cname_localdomain,
+        settings.dry_run,
     )
 
 
