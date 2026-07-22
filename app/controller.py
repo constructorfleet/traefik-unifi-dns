@@ -40,6 +40,9 @@ class Controller:
                 {
                     "action": "plan",
                     "services": len(services),
+                    "enabled_services": plan.enabled_services,
+                    "skipped_services": plan.skipped_services,
+                    "services_with_traefik_rules": plan.services_with_traefik_rules,
                     "claims": len(plan.claims),
                     "desired": len(plan.desired),
                     "conflicts": len(plan.conflicts),

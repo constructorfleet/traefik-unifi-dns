@@ -15,6 +15,9 @@ class RecordPlan:
     conflicts: set[str]
     ignored: tuple["IgnoredSource", ...] = ()
     claims: tuple["SourceClaim", ...] = ()
+    enabled_services: int = 0
+    skipped_services: int = 0
+    services_with_traefik_rules: int = 0
 
 
 @dataclass(frozen=True)
@@ -98,12 +101,22 @@ def plan_records(
     claims = defaultdict(set)
     source_claims = []
     ignored = []
+    enabled_services = 0
+    skipped_services = 0
+    services_with_traefik_rules = 0
     for service in services:
         spec = service.get("Spec", {})
         service_name = spec.get("Name", "")
         labels = spec.get("Labels", {}) or {}
+        has_traefik_rules = any(
+            key.startswith("traefik.http.routers.") and key.endswith(".rule") for key in labels
+        )
+        if has_traefik_rules:
+            services_with_traefik_rules += 1
         if labels.get("unifi-dns.enable", "").lower() != "true":
+            skipped_services += 1
             continue
+        enabled_services += 1
         target = labels.get("unifi-dns.target", default_target).strip().lower()
         if not target or not valid_target(target):
             continue
@@ -147,6 +160,9 @@ def plan_records(
         conflicts=conflicts,
         ignored=tuple(ignored),
         claims=tuple(source_claims),
+        enabled_services=enabled_services,
+        skipped_services=skipped_services,
+        services_with_traefik_rules=services_with_traefik_rules,
     )
 
 

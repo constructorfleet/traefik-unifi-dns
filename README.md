@@ -49,6 +49,9 @@ Sources can come from literal Traefik `Host(...)` values or from a comma/whitesp
 `ALLOWED_ZONES` are ignored. `ALLOWED_ZONES` is an allowlist for fully qualified hostnames; it
 does not append zones to short source names.
 
+Traefik labels alone are not enough. The controller only reads services with
+`unifi-dns.enable: "true"`, so `traefik.enable: "true"` without the UniFi DNS opt-in is skipped.
+
 Use `unifi-dns.source.<target>` when one service needs to claim hostnames for different CNAME
 targets:
 

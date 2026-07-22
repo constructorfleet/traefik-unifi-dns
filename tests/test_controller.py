@@ -76,6 +76,31 @@ class RuleExtractionTests(unittest.TestCase):
                 ("dup-b", "traefik", "traefik.http.routers.app.rule", "two"),
             ],
         )
+        self.assertEqual(plan.enabled_services, 3)
+        self.assertEqual(plan.skipped_services, 0)
+        self.assertEqual(plan.services_with_traefik_rules, 3)
+
+    def test_traefik_rule_without_unifi_opt_in_is_skipped(self):
+        plan = plan_records(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "traefik.enable": "true",
+                            "traefik.http.routers.app.rule": ("Host(`app.home.prettybaked.com`)"),
+                        },
+                    }
+                }
+            ],
+            ["home.prettybaked.com"],
+        )
+
+        self.assertEqual(plan.desired, {})
+        self.assertEqual(plan.claims, ())
+        self.assertEqual(plan.enabled_services, 0)
+        self.assertEqual(plan.skipped_services, 1)
+        self.assertEqual(plan.services_with_traefik_rules, 1)
 
     def test_source_label_adds_manual_hosts(self):
         services = [
@@ -239,6 +264,9 @@ class ReconcileTests(unittest.TestCase):
         messages = "\n".join(logs.output)
         self.assertIn('"action": "plan"', messages)
         self.assertIn('"services": 1', messages)
+        self.assertIn('"enabled_services": 1', messages)
+        self.assertIn('"skipped_services": 0', messages)
+        self.assertIn('"services_with_traefik_rules": 1', messages)
         self.assertIn('"desired": 1', messages)
         self.assertIn('"unifi_records": 0', messages)
         self.assertIn('"action": "reconcile"', messages)
