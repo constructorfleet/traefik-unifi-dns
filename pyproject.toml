@@ -1,0 +1,20 @@
+[project]
+name = "traefik-unifi-dns"
+version = "0.1.0"
+description = "Dockerized controller that reconciles Traefik router Host labels into UniFi static DNS records."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests==2.32.5",
+    "requests-unixsocket==0.4.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "SIM", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"

@@ -1,10 +1,11 @@
 """Environment-driven application configuration."""
+
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
 
 
 @dataclass(frozen=True)
@@ -25,9 +26,7 @@ class Settings:
         values = os.environ if env is None else env
         unifi_url = values.get("UNIFI_URL", "").strip()
         allowed_zones = tuple(
-            zone.strip()
-            for zone in values.get("ALLOWED_ZONES", "").split(",")
-            if zone.strip()
+            zone.strip() for zone in values.get("ALLOWED_ZONES", "").split(",") if zone.strip()
         )
 
         if not unifi_url:

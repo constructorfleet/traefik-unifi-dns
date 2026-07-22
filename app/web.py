@@ -1,4 +1,5 @@
 """HTTP endpoints for health checks, metrics, and the controller dashboard."""
+
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -41,9 +42,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def _send_metrics(self) -> None:
         controller = self.server.controller
         metrics = (
-            "unifi_dns_traefik_conflicts {conflicts}\n"
-            "unifi_dns_traefik_owned_records {owned}\n"
-        ).format(conflicts=len(controller.conflicts), owned=len(controller.ownership))
+            f"unifi_dns_traefik_conflicts {len(controller.conflicts)}\n"
+            f"unifi_dns_traefik_owned_records {len(controller.ownership)}\n"
+        )
         self.send_response(200)
         self.end_headers()
         self.wfile.write(metrics.encode())
