@@ -16,7 +16,11 @@ class WebEndpointTests(unittest.TestCase):
             self.assertResponse(server, "/readyz", 200, b'{"ready": true}')
             self.assertResponse(server, "/metrics", 200, b"unifi_dns_traefik_owned_records 1\n")
             self.assertResponse(server, "/metrics", 200, b"unifi_dns_traefik_dry_run 0\n")
-            self.assertResponse(server, "/", 200, b"app.home.prettybaked.com")
+            self.assertResponse(server, "/", 200, b"new EventSource")
+            self.assertResponse(server, "/api/state", 200, b'"owned_records"')
+            self.assertResponse(server, "/api/state", 200, b"app.home.prettybaked.com")
+            self.assertResponse(server, "/events", 200, b"event: state")
+            self.assertResponse(server, "/events", 200, b"data: ")
         finally:
             server.shutdown()
             server.server_close()

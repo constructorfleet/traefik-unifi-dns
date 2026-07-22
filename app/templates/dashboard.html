@@ -2,33 +2,234 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>UniFi DNS Traefik</title>
   <style>
-    body{font:16px system-ui;max-width:800px;margin:3rem auto;color:#172033}
-    table{border-collapse:collapse;width:100%}
-    td,th{padding:.6rem;border-bottom:1px solid #d9dee8;text-align:left}
-    code{background:#f2f4f8;padding:.2rem}
+    :root{
+      color-scheme:light;
+      --bg:#f6f8fb;
+      --panel:#ffffff;
+      --text:#182230;
+      --muted:#667085;
+      --line:#d9e1ec;
+      --accent:#0f766e;
+      --accent-soft:#e6f4f1;
+      --warn:#b42318;
+      --warn-soft:#fff1f0;
+      --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 24px rgba(16,24,40,.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:2;
+      border-bottom:1px solid var(--line);
+      background:rgba(246,248,251,.94);
+      backdrop-filter:blur(12px);
+    }
+    .shell{max-width:1180px;margin:0 auto;padding:20px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    h1{margin:0;font-size:22px;font-weight:700;letter-spacing:0}
+    h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:0}
+    .subtitle{margin:4px 0 0;color:var(--muted)}
+    .status{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap}
+    .dot{width:9px;height:9px;border-radius:999px;background:#98a2b3}
+    .dot.live{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.12)}
+    .dot.error{background:#f04438;box-shadow:0 0 0 4px rgba(240,68,56,.12)}
+    main.shell{display:grid;gap:18px}
+    .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .card,.panel{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:8px;
+      box-shadow:var(--shadow);
+    }
+    .card{padding:16px}
+    .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+    .value{margin-top:8px;font-size:28px;font-weight:750;line-height:1}
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      min-height:24px;
+      border-radius:999px;
+      padding:3px 10px;
+      background:var(--accent-soft);
+      color:var(--accent);
+      font-weight:650;
+    }
+    .badge.warn{background:var(--warn-soft);color:var(--warn)}
+    .grid{display:grid;grid-template-columns:1fr;gap:18px}
+    .panel{overflow:hidden}
+    .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
+    .panel-note{color:var(--muted);font-size:13px}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:11px 16px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#fbfcfe}
+    td{font-size:13px}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
+    .empty{padding:22px 16px;color:var(--muted)}
+    .error-text{color:var(--warn)}
+    @media (max-width:760px){
+      .shell{padding:14px}
+      .topbar{align-items:flex-start;flex-direction:column}
+      .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+      th,td{padding:10px 12px}
+    }
   </style>
 </head>
 <body>
-  <h1>UniFi DNS Traefik</h1>
-  <p>Dry run: <code>$dry_run</code></p>
-  <p>Conflicts: <code>$conflicts</code></p>
-  <p>Last error: <code>$error</code></p>
-  <h2>Owned records</h2>
-  <table>
-    <tr><th>Hostname</th><th>CNAME target</th></tr>
-    $rows
-  </table>
-  <h2>Source claims</h2>
-  <table>
-    <tr><th>Hostname</th><th>Target</th><th>Service</th><th>Type</th><th>Label</th></tr>
-    $claim_rows
-  </table>
-  <h2>Ignored labels</h2>
-  <table>
-    <tr><th>Service</th><th>Label</th><th>Hostname</th><th>Reason</th></tr>
-    $ignored_rows
-  </table>
+  <header>
+    <div class="shell topbar">
+      <div>
+        <h1>UniFi DNS Traefik</h1>
+        <p class="subtitle">Live reconciliation state from Docker service labels and UniFi static DNS.</p>
+      </div>
+      <div class="status"><span id="connection-dot" class="dot"></span><span id="connection-text">Connecting</span></div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="cards" aria-label="Summary">
+      <div class="card"><div class="label">Owned</div><div id="owned-count" class="value">0</div></div>
+      <div class="card"><div class="label">Claims</div><div id="claims-count" class="value">0</div></div>
+      <div class="card"><div class="label">Conflicts</div><div id="conflicts-count" class="value">0</div></div>
+      <div class="card"><div class="label">Ignored</div><div id="ignored-count" class="value">0</div></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Status</h2>
+        <span id="dry-run" class="badge">Dry run unknown</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><th>Last reconcile</th><td id="last-reconcile">Never</td></tr>
+            <tr><th>Last error</th><td id="last-error">None</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="grid">
+      <section class="panel">
+        <div class="panel-head"><h2>Owned Records</h2><span class="panel-note">Controller-owned UniFi CNAMEs</span></div>
+        <div id="owned-records" class="table-wrap"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Source Claims</h2><span class="panel-note">Active host claims from labels</span></div>
+        <div id="claims" class="table-wrap"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Ignored Labels</h2><span class="panel-note">Rejected sources and reasons</span></div>
+        <div id="ignored" class="table-wrap"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Conflicts</h2><span class="panel-note">Hosts claimed by multiple targets</span></div>
+        <div id="conflicts" class="table-wrap"></div>
+      </section>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function text(value) {
+      return value === null || value === undefined || value === "" ? "None" : String(value);
+    }
+
+    function cell(value) {
+      const td = document.createElement("td");
+      td.textContent = text(value);
+      return td;
+    }
+
+    function renderTable(target, columns, rows, emptyText) {
+      const root = $(target);
+      root.replaceChildren();
+      if (!rows.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = emptyText;
+        root.append(empty);
+        return;
+      }
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const header = document.createElement("tr");
+      for (const column of columns) {
+        const th = document.createElement("th");
+        th.textContent = column.label;
+        header.append(th);
+      }
+      thead.append(header);
+      const tbody = document.createElement("tbody");
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        for (const column of columns) tr.append(cell(row[column.key]));
+        tbody.append(tr);
+      }
+      table.append(thead, tbody);
+      root.append(table);
+    }
+
+    function renderState(state) {
+      $("owned-count").textContent = state.counts.owned;
+      $("claims-count").textContent = state.counts.claims;
+      $("conflicts-count").textContent = state.counts.conflicts;
+      $("ignored-count").textContent = state.counts.ignored;
+      $("dry-run").textContent = state.dry_run ? "Dry run enabled" : "Dry run disabled";
+      $("dry-run").className = state.dry_run ? "badge warn" : "badge";
+      $("last-reconcile").textContent = state.last_reconcile ? new Date(state.last_reconcile * 1000).toLocaleString() : "Never";
+      $("last-error").textContent = text(state.last_error);
+      $("last-error").className = state.last_error ? "error-text" : "";
+      renderTable("owned-records", [
+        {key:"hostname", label:"Hostname"},
+        {key:"target", label:"CNAME target"}
+      ], state.owned_records, "No controller-owned records");
+      renderTable("claims", [
+        {key:"hostname", label:"Hostname"},
+        {key:"target", label:"Target"},
+        {key:"service", label:"Service"},
+        {key:"type", label:"Type"},
+        {key:"label", label:"Label"}
+      ], state.claims, "No active source claims");
+      renderTable("ignored", [
+        {key:"service", label:"Service"},
+        {key:"label", label:"Label"},
+        {key:"hostname", label:"Hostname"},
+        {key:"reason", label:"Reason"}
+      ], state.ignored, "No ignored labels");
+      renderTable("conflicts", [{key:"hostname", label:"Hostname"}], state.conflicts.map((hostname) => ({hostname})), "No conflicts");
+    }
+
+    async function fetchState() {
+      const response = await fetch("/api/state", {cache:"no-store"});
+      renderState(await response.json());
+    }
+
+    function setConnection(state, message) {
+      $("connection-dot").className = `dot ${state}`;
+      $("connection-text").textContent = message;
+    }
+
+    function connectEvents() {
+      if (!window.EventSource) {
+        setConnection("", "Polling");
+        fetchState();
+        setInterval(fetchState, 3000);
+        return;
+      }
+      const events = new EventSource("/events");
+      events.onopen = () => setConnection("live", "Live");
+      events.addEventListener("state", (event) => renderState(JSON.parse(event.data)));
+      events.onerror = () => setConnection("error", "Reconnecting");
+    }
+
+    connectEvents();
+  </script>
 </body>
 </html>

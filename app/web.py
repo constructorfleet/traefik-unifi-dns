@@ -3,7 +3,7 @@
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from .dashboard import render_dashboard
+from .dashboard import dashboard_state, render_dashboard
 
 
 class DashboardHttpServer(ThreadingHTTPServer):
@@ -24,16 +24,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/metrics":
             self._send_metrics()
             return
-        self._send_html(
-            render_dashboard(
-                self.server.controller.ownership,
-                self.server.controller.conflicts,
-                self.server.controller.last_error,
-                self.server.controller.ignored,
-                self.server.controller.claims,
-                self.server.controller.dry_run,
-            )
-        )
+        if self.path == "/api/state":
+            self._send_json(200, dashboard_state(self.server.controller))
+            return
+        if self.path == "/events":
+            self._send_event(dashboard_state(self.server.controller))
+            return
+        self._send_html(render_dashboard())
 
     def _send_json(self, status: int, body: dict[str, object]) -> None:
         data = json.dumps(body).encode()
@@ -52,6 +49,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(metrics.encode())
+
+    def _send_event(self, body: dict[str, object]) -> None:
+        data = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(b"retry: 3000\n")
+        self.wfile.write(b"event: state\n")
+        self.wfile.write(b"data: " + data + b"\n\n")
 
     def _send_html(self, html: str) -> None:
         self.send_response(200)
