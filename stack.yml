@@ -17,13 +17,8 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_CLIENT_SECRET_FILE: ${OIDC_CLIENT_SECRET_FILE:-}
-      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
-      OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
-      OIDC_ALLOWED_GROUPS: ${OIDC_ALLOWED_GROUPS:-}
-      OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-groups}
       OIDC_COOKIE_SECRET: ${OIDC_COOKIE_SECRET:-}
       OIDC_COOKIE_SECRET_FILE: ${OIDC_COOKIE_SECRET_FILE:-}
-      OIDC_COOKIE_SECURE: ${OIDC_COOKIE_SECURE:-true}
     secrets:
       - source: unifi_dns_traefik_api_key
         target: unifi_api_key
