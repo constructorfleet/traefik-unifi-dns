@@ -25,6 +25,7 @@ class SourceClaim:
     host: str
     target: str
     service: str
+    stack: str
     label: str
     kind: str
 
@@ -32,6 +33,7 @@ class SourceClaim:
 @dataclass(frozen=True)
 class IgnoredSource:
     service: str
+    stack: str
     label: str
     host: str
     reason: str
@@ -110,6 +112,7 @@ def plan_records(
         spec = service.get("Spec", {})
         service_name = spec.get("Name", "")
         labels = spec.get("Labels", {}) or {}
+        stack_name = labels.get("com.docker.stack.namespace", "")
         has_traefik_rules = any(
             key.startswith("traefik.http.routers.") and key.endswith(".rule") for key in labels
         )
@@ -128,13 +131,16 @@ def plan_records(
                 continue
             for host in extract_sources(source):
                 if not valid_target(source_target):
-                    ignored.append(IgnoredSource(service_name, key, host, "invalid target"))
+                    ignored.append(
+                        IgnoredSource(service_name, stack_name, key, host, "invalid target")
+                    )
                     continue
                 _claim_source(
                     claims,
                     source_claims,
                     ignored,
                     service_name,
+                    stack_name,
                     key,
                     host,
                     source_target,
@@ -149,6 +155,7 @@ def plan_records(
                         source_claims,
                         ignored,
                         service_name,
+                        stack_name,
                         key,
                         host,
                         target,
@@ -173,6 +180,7 @@ def _claim_source(
     source_claims: list[SourceClaim],
     ignored: list[IgnoredSource],
     service_name: str,
+    stack_name: str,
     label: str,
     host: str,
     target: str,
@@ -180,16 +188,18 @@ def _claim_source(
     kind: str,
 ) -> None:
     if "*" in host:
-        ignored.append(IgnoredSource(service_name, label, host, "wildcard source"))
+        ignored.append(IgnoredSource(service_name, stack_name, label, host, "wildcard source"))
         return
     if not valid_hostname(host):
-        ignored.append(IgnoredSource(service_name, label, host, "invalid hostname"))
+        ignored.append(IgnoredSource(service_name, stack_name, label, host, "invalid hostname"))
         return
     if not _allowed(host, zones):
-        ignored.append(IgnoredSource(service_name, label, host, "outside allowed zones"))
+        ignored.append(
+            IgnoredSource(service_name, stack_name, label, host, "outside allowed zones")
+        )
         return
     claims[host].add(target)
-    source_claims.append(SourceClaim(host, target, service_name, label, kind))
+    source_claims.append(SourceClaim(host, target, service_name, stack_name, label, kind))
 
 
 def _source_label_target(label: str, default_target: str) -> str | None:

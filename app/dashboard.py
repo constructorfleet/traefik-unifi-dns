@@ -6,6 +6,7 @@ DASHBOARD_TEMPLATE = (Path(__file__).parent / "templates" / "dashboard.html").re
 
 
 def dashboard_state(controller) -> dict[str, object]:
+    claims_by_host = {claim.host: claim for claim in controller.claims}
     return {
         "dry_run": controller.dry_run,
         "last_error": controller.last_error,
@@ -17,13 +18,19 @@ def dashboard_state(controller) -> dict[str, object]:
             "claims": len(controller.claims),
         },
         "owned_records": [
-            {"hostname": host, "target": target}
+            {
+                "hostname": host,
+                "target": target,
+                "service": claims_by_host[host].service if host in claims_by_host else "",
+                "stack": claims_by_host[host].stack if host in claims_by_host else "",
+            }
             for host, target in sorted(controller.ownership.items())
         ],
         "conflicts": sorted(controller.conflicts),
         "ignored": [
             {
                 "service": item.service,
+                "stack": item.stack,
                 "label": item.label,
                 "hostname": item.host,
                 "reason": item.reason,
@@ -35,6 +42,7 @@ def dashboard_state(controller) -> dict[str, object]:
                 "hostname": claim.host,
                 "target": claim.target,
                 "service": claim.service,
+                "stack": claim.stack,
                 "type": claim.kind,
                 "label": claim.label,
             }

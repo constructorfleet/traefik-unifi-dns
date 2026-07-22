@@ -11,6 +11,9 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("new EventSource", html)
         self.assertIn('addEventListener("state"', html)
         self.assertIn("/events", html)
+        self.assertIn("stack-filter", html)
+        self.assertIn("service-filter", html)
+        self.assertIn("url-filter", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)
 
@@ -19,21 +22,34 @@ class DashboardTests(unittest.TestCase):
 
         self.assertEqual(state["dry_run"], True)
         self.assertEqual(state["counts"]["owned"], 1)
-        self.assertEqual(state["owned_records"], [{"hostname": "app.home", "target": "edge.local"}])
+        self.assertEqual(
+            state["owned_records"],
+            [
+                {
+                    "hostname": "app.home",
+                    "target": "edge.local",
+                    "service": "app",
+                    "stack": "nginx",
+                }
+            ],
+        )
         self.assertEqual(state["conflicts"], ["dup.home"])
+        self.assertEqual(state["ignored"][0]["stack"], "nginx")
         self.assertEqual(state["ignored"][0]["reason"], "invalid")
+        self.assertEqual(state["claims"][0]["stack"], "nginx")
         self.assertEqual(state["claims"][0]["type"], "traefik")
 
 
 class FakeController:
     ownership = {"app.home": "edge.local"}
     conflicts = {"dup.home"}
-    ignored = (IgnoredSource("app", "unifi-dns.source", "bad.home", "invalid"),)
+    ignored = (IgnoredSource("app", "nginx", "unifi-dns.source", "bad.home", "invalid"),)
     claims = (
         SourceClaim(
             host="app.home",
             target="edge",
             service="app",
+            stack="nginx",
             label="traefik.http.routers.app.rule",
             kind="traefik",
         ),

@@ -109,6 +109,7 @@ class RuleExtractionTests(unittest.TestCase):
                     "Spec": {
                         "Name": "app",
                         "Labels": {
+                            "com.docker.stack.namespace": "nginx",
                             "traefik.enable": "true",
                             "traefik.http.routers.app.rule": ("Host(`app.home.prettybaked.com`)"),
                         },
@@ -120,6 +121,7 @@ class RuleExtractionTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+        self.assertEqual(plan.claims[0].stack, "nginx")
         self.assertEqual(plan.enabled_services, 1)
         self.assertEqual(plan.skipped_services, 0)
         self.assertEqual(plan.services_with_traefik_rules, 1)

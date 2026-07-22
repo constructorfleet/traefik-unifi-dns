@@ -65,6 +65,21 @@
     }
     .badge.warn{background:var(--warn-soft);color:var(--warn)}
     .grid{display:grid;grid-template-columns:1fr;gap:18px}
+    .filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:12px;align-items:end;padding:16px}
+    .field{display:grid;gap:6px}
+    .field label{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    input,select,button{
+      width:100%;
+      min-height:38px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      color:var(--text);
+      font:inherit;
+      padding:7px 10px;
+    }
+    button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+    button:hover{filter:brightness(.96)}
     .panel{overflow:hidden}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
     .panel-note{color:var(--muted);font-size:13px}
@@ -80,6 +95,7 @@
       .shell{padding:14px}
       .topbar{align-items:flex-start;flex-direction:column}
       .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .filters{grid-template-columns:1fr}
       th,td{padding:10px 12px}
     }
   </style>
@@ -100,6 +116,27 @@
       <div class="card"><div class="label">Claims</div><div id="claims-count" class="value">0</div></div>
       <div class="card"><div class="label">Conflicts</div><div id="conflicts-count" class="value">0</div></div>
       <div class="card"><div class="label">Ignored</div><div id="ignored-count" class="value">0</div></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Filters</h2>
+        <span id="filter-summary" class="panel-note">Showing all rows</span>
+      </div>
+      <div class="filters">
+        <div class="field">
+          <label for="url-filter">URL</label>
+          <input id="url-filter" type="search" placeholder="Filter hostnames">
+        </div>
+        <div class="field">
+          <label for="stack-filter">Stack</label>
+          <select id="stack-filter"><option value="">All stacks</option></select>
+        </div>
+        <div class="field">
+          <label for="service-filter">Service</label>
+          <select id="service-filter"><option value="">All services</option></select>
+        </div>
+        <button id="clear-filters" type="button">Clear</button>
+      </div>
     </section>
     <section class="panel">
       <div class="panel-head">
@@ -136,6 +173,8 @@
   </main>
   <script>
     const $ = (id) => document.getElementById(id);
+    let currentState = null;
+    const filters = {url:"", stack:"", service:""};
 
     function text(value) {
       return value === null || value === undefined || value === "" ? "None" : String(value);
@@ -176,34 +215,107 @@
       root.append(table);
     }
 
+    function matchesFilters(row) {
+      const hostname = text(row.hostname).toLowerCase();
+      const urlMatch = !filters.url || hostname.includes(filters.url);
+      const stackMatch = !filters.stack || row.stack === filters.stack;
+      const serviceMatch = !filters.service || row.service === filters.service;
+      return urlMatch && stackMatch && serviceMatch;
+    }
+
+    function filterRows(rows, options = {}) {
+      return rows.filter((row) => {
+        const hostname = text(row.hostname).toLowerCase();
+        if (filters.url && !hostname.includes(filters.url)) return false;
+        if (!options.ignoreStack && filters.stack && row.stack !== filters.stack) return false;
+        if (!options.ignoreService && filters.service && row.service !== filters.service) return false;
+        return true;
+      });
+    }
+
+    function updateSelect(id, values, selected, allLabel) {
+      const select = $(id);
+      select.replaceChildren();
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = allLabel;
+      select.append(all);
+      for (const value of values) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        option.selected = value === selected;
+        select.append(option);
+      }
+      if (selected && !values.includes(selected)) {
+        select.value = "";
+        filters[id === "stack-filter" ? "stack" : "service"] = "";
+      }
+    }
+
+    function updateFilterOptions(state) {
+      const rows = [...state.claims, ...state.ignored, ...state.owned_records];
+      const stacks = [...new Set(rows.map((row) => row.stack).filter(Boolean))].sort();
+      const services = [...new Set(rows
+        .filter((row) => !filters.stack || row.stack === filters.stack)
+        .map((row) => row.service)
+        .filter(Boolean))].sort();
+      updateSelect("stack-filter", stacks, filters.stack, "All stacks");
+      updateSelect("service-filter", services, filters.service, "All services");
+    }
+
+    function renderFilteredState() {
+      if (!currentState) return;
+      updateFilterOptions(currentState);
+      const owned = filterRows(currentState.owned_records);
+      const claims = filterRows(currentState.claims);
+      const ignored = filterRows(currentState.ignored);
+      const conflicts = filterRows(
+        currentState.conflicts.map((hostname) => ({hostname})),
+        {ignoreStack:true, ignoreService:true}
+      );
+      $("owned-count").textContent = owned.length;
+      $("claims-count").textContent = claims.length;
+      $("conflicts-count").textContent = conflicts.length;
+      $("ignored-count").textContent = ignored.length;
+      const active = [filters.url && `URL contains "${filters.url}"`, filters.stack && `stack ${filters.stack}`, filters.service && `service ${filters.service}`].filter(Boolean);
+      $("filter-summary").textContent = active.length ? `Filtered by ${active.join(", ")}` : "Showing all rows";
+      renderTables(owned, claims, ignored, conflicts);
+    }
+
+    function renderTables(owned, claims, ignored, conflicts) {
+      renderTable("owned-records", [
+        {key:"hostname", label:"Hostname"},
+        {key:"target", label:"CNAME target"},
+        {key:"stack", label:"Stack"},
+        {key:"service", label:"Service"}
+      ], owned, "No controller-owned records match the filters");
+      renderTable("claims", [
+        {key:"hostname", label:"Hostname"},
+        {key:"target", label:"Target"},
+        {key:"stack", label:"Stack"},
+        {key:"service", label:"Service"},
+        {key:"type", label:"Type"},
+        {key:"label", label:"Label"}
+      ], claims, "No active source claims match the filters");
+      renderTable("ignored", [
+        {key:"stack", label:"Stack"},
+        {key:"service", label:"Service"},
+        {key:"label", label:"Label"},
+        {key:"hostname", label:"Hostname"},
+        {key:"reason", label:"Reason"}
+      ], ignored, "No ignored labels match the filters");
+      renderTable("conflicts", [{key:"hostname", label:"Hostname"}], conflicts, "No conflicts match the URL filter");
+    }
+
     function renderState(state) {
-      $("owned-count").textContent = state.counts.owned;
-      $("claims-count").textContent = state.counts.claims;
-      $("conflicts-count").textContent = state.counts.conflicts;
-      $("ignored-count").textContent = state.counts.ignored;
+      currentState = state;
       $("dry-run").textContent = state.dry_run ? "Dry run enabled" : "Dry run disabled";
       $("dry-run").className = state.dry_run ? "badge warn" : "badge";
       $("last-reconcile").textContent = state.last_reconcile ? new Date(state.last_reconcile * 1000).toLocaleString() : "Never";
       $("last-error").textContent = text(state.last_error);
       $("last-error").className = state.last_error ? "error-text" : "";
-      renderTable("owned-records", [
-        {key:"hostname", label:"Hostname"},
-        {key:"target", label:"CNAME target"}
-      ], state.owned_records, "No controller-owned records");
-      renderTable("claims", [
-        {key:"hostname", label:"Hostname"},
-        {key:"target", label:"Target"},
-        {key:"service", label:"Service"},
-        {key:"type", label:"Type"},
-        {key:"label", label:"Label"}
-      ], state.claims, "No active source claims");
-      renderTable("ignored", [
-        {key:"service", label:"Service"},
-        {key:"label", label:"Label"},
-        {key:"hostname", label:"Hostname"},
-        {key:"reason", label:"Reason"}
-      ], state.ignored, "No ignored labels");
-      renderTable("conflicts", [{key:"hostname", label:"Hostname"}], state.conflicts.map((hostname) => ({hostname})), "No conflicts");
+      renderFilteredState();
     }
 
     async function fetchState() {
@@ -228,6 +340,26 @@
       events.addEventListener("state", (event) => renderState(JSON.parse(event.data)));
       events.onerror = () => setConnection("error", "Reconnecting");
     }
+
+    $("url-filter").addEventListener("input", (event) => {
+      filters.url = event.target.value.trim().toLowerCase();
+      renderFilteredState();
+    });
+    $("stack-filter").addEventListener("change", (event) => {
+      filters.stack = event.target.value;
+      renderFilteredState();
+    });
+    $("service-filter").addEventListener("change", (event) => {
+      filters.service = event.target.value;
+      renderFilteredState();
+    });
+    $("clear-filters").addEventListener("click", () => {
+      filters.url = "";
+      filters.stack = "";
+      filters.service = "";
+      $("url-filter").value = "";
+      renderFilteredState();
+    });
 
     connectEvents();
   </script>
