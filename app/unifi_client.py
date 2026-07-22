@@ -31,26 +31,39 @@ class UnifiStaticDnsClient:
         return []
 
     def create(self, host: str, target: str) -> None:
-        self._write("post", {"key": host, "value": target, "type": "cname"})
+        self._create(host, target)
 
     def update(self, host: str, target: str) -> None:
-        self._write("put", {"key": host, "value": target, "type": "cname"})
+        self.delete(host)
+        self._create(host, target)
 
     def delete(self, host: str) -> None:
+        record_id = self._record_id(host)
         response = requests.delete(
-            f"{self.url}/{host}",
+            f"{self.url}/{record_id}",
             headers=self.headers,
             timeout=20,
             verify=self.verify_ssl,
         )
         response.raise_for_status()
 
-    def _write(self, method: str, payload: dict[str, str]) -> None:
-        response = getattr(requests, method)(
+    def _create(self, host: str, target: str) -> None:
+        response = requests.post(
             self.url,
             headers=self.headers,
-            json=payload,
+            json={
+                "enabled": True,
+                "key": host,
+                "record_type": "CNAME",
+                "value": target,
+            },
             timeout=20,
             verify=self.verify_ssl,
         )
         response.raise_for_status()
+
+    def _record_id(self, host: str) -> str:
+        for record in self.list():
+            if record.get("key") == host and record.get("_id"):
+                return str(record["_id"])
+        raise ValueError(f"UniFi record not found: {host}")

@@ -20,15 +20,69 @@ class UnifiStaticDnsClientTests(unittest.TestCase):
                 client.list()
             with patch("app.unifi_client.requests.post", return_value=FakeResponse({})) as post:
                 client.create("app.home", "docker-swarm.local")
-            with patch("app.unifi_client.requests.put", return_value=FakeResponse({})) as put:
-                client.update("app.home", "edge.local")
-            with patch("app.unifi_client.requests.delete", return_value=FakeResponse({})) as delete:
+            with (
+                patch(
+                    "app.unifi_client.requests.get",
+                    return_value=FakeResponse([{"_id": "record-id", "key": "app.home"}]),
+                ),
+                patch("app.unifi_client.requests.delete", return_value=FakeResponse({})) as delete,
+            ):
                 client.delete("app.home")
 
         self.assertFalse(get.call_args.kwargs["verify"])
         self.assertFalse(post.call_args.kwargs["verify"])
-        self.assertFalse(put.call_args.kwargs["verify"])
         self.assertFalse(delete.call_args.kwargs["verify"])
+
+    def test_create_uses_legacy_static_dns_payload(self):
+        with (
+            client_with_key() as client,
+            patch("app.unifi_client.requests.post", return_value=FakeResponse({})) as post,
+        ):
+            client.create("app.home", "docker-swarm.local")
+
+        self.assertEqual(
+            post.call_args.kwargs["json"],
+            {
+                "enabled": True,
+                "key": "app.home",
+                "record_type": "CNAME",
+                "value": "docker-swarm.local",
+            },
+        )
+
+    def test_delete_uses_unifi_record_id(self):
+        with (
+            client_with_key() as client,
+            patch(
+                "app.unifi_client.requests.get",
+                return_value=FakeResponse([{"_id": "record-id", "key": "app.home"}]),
+            ),
+            patch("app.unifi_client.requests.delete", return_value=FakeResponse({})) as delete,
+        ):
+            client.delete("app.home")
+
+        self.assertEqual(
+            delete.call_args.args[0],
+            "https://unifi.local/proxy/network/v2/api/site/default/static-dns/record-id",
+        )
+
+    def test_update_recreates_record_with_legacy_api(self):
+        with (
+            client_with_key() as client,
+            patch(
+                "app.unifi_client.requests.get",
+                return_value=FakeResponse([{"_id": "record-id", "key": "app.home"}]),
+            ),
+            patch("app.unifi_client.requests.delete", return_value=FakeResponse({})) as delete,
+            patch("app.unifi_client.requests.post", return_value=FakeResponse({})) as post,
+        ):
+            client.update("app.home", "edge.local")
+
+        self.assertEqual(
+            delete.call_args.args[0],
+            "https://unifi.local/proxy/network/v2/api/site/default/static-dns/record-id",
+        )
+        self.assertEqual(post.call_args.kwargs["json"]["value"], "edge.local")
 
     def test_list_accepts_data_wrapped_response(self):
         with (
