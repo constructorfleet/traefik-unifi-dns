@@ -1,0 +1,30 @@
+services:
+  unifi-dns-traefik:
+    build: .
+    environment:
+      # Default to the existing narrow Docker socket proxy. A unix:// endpoint
+      # is supported for an explicitly configured direct-socket deployment.
+      DOCKER_HOST: ${DOCKER_HOST:-http://docker-socket-proxy:2375}
+      UNIFI_URL: ${UNIFI_URL:?set UNIFI_URL}
+      ALLOWED_ZONES: ${ALLOWED_ZONES:-home.prettybaked.com,home.constructorfleet.stream}
+    secrets:
+      - source: unifi_dns_traefik_api_key
+        target: unifi_api_key
+    volumes:
+      - unifi_dns_traefik_state:/state
+    ports:
+      - "8080:8080"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+volumes:
+  unifi_dns_traefik_state:
+secrets:
+  unifi_dns_traefik_api_key:
+    file: ./secrets/unifi-dns-traefik-api-key
