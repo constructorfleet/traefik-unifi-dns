@@ -18,6 +18,19 @@
       --warn-soft:#fff1f0;
       --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 24px rgba(16,24,40,.08);
     }
+    [data-theme="dark"]{
+      color-scheme:dark;
+      --bg:#0f1419;
+      --panel:#151b22;
+      --text:#e5edf5;
+      --muted:#94a3b8;
+      --line:#2d3745;
+      --accent:#2dd4bf;
+      --accent-soft:#12332f;
+      --warn:#fb7185;
+      --warn-soft:#3b1720;
+      --shadow:0 1px 2px rgba(0,0,0,.32),0 10px 24px rgba(0,0,0,.28);
+    }
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -33,12 +46,14 @@
       background:rgba(246,248,251,.94);
       backdrop-filter:blur(12px);
     }
+    [data-theme="dark"] header{background:rgba(15,20,25,.94)}
     .shell{max-width:1180px;margin:0 auto;padding:20px}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
     h1{margin:0;font-size:22px;font-weight:700;letter-spacing:0}
     h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:0}
     .subtitle{margin:4px 0 0;color:var(--muted)}
     .status{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap}
+    .header-actions{display:flex;align-items:center;gap:12px}
     .dot{width:9px;height:9px;border-radius:999px;background:#98a2b3}
     .dot.live{background:#12b76a;box-shadow:0 0 0 4px rgba(18,183,106,.12)}
     .dot.error{background:#f04438;box-shadow:0 0 0 4px rgba(240,68,56,.12)}
@@ -70,7 +85,7 @@
       width:auto;
       min-height:34px;
       border-color:var(--line);
-      background:#fff;
+      background:var(--panel);
       color:var(--muted);
       white-space:nowrap;
     }
@@ -84,7 +99,7 @@
       min-height:38px;
       border:1px solid var(--line);
       border-radius:8px;
-      background:#fff;
+      background:var(--panel);
       color:var(--text);
       font:inherit;
       padding:7px 10px;
@@ -92,8 +107,9 @@
     button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
     button:hover{filter:brightness(.96)}
     button.danger{background:var(--warn);border-color:var(--warn)}
-    button.secondary{background:#fff;border-color:var(--line);color:var(--text)}
-    .row-action{width:auto;min-height:30px;padding:5px 9px;font-size:12px}
+    button.secondary{background:var(--panel);border-color:var(--line);color:var(--text)}
+    .icon-button{display:inline-flex;align-items:center;justify-content:center;width:32px;min-height:30px;padding:5px}
+    .icon-button svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
     .actions{display:flex;gap:8px;align-items:center}
     .panel{overflow:hidden}
     .table-panel[hidden]{display:none}
@@ -124,7 +140,10 @@
         <h1>UniFi DNS Traefik</h1>
         <p class="subtitle">Live reconciliation state from Docker service labels and UniFi static DNS.</p>
       </div>
-      <div class="status"><span id="connection-dot" class="dot"></span><span id="connection-text">Connecting</span></div>
+      <div class="header-actions">
+        <button id="theme-toggle" class="secondary icon-button" type="button" aria-label="Toggle dark theme" title="Toggle dark theme"></button>
+        <div class="status"><span id="connection-dot" class="dot"></span><span id="connection-text">Connecting</span></div>
+      </div>
     </div>
   </header>
   <main class="shell">
@@ -234,15 +253,19 @@
         actions.className = "actions";
         const edit = document.createElement("button");
         edit.type = "button";
-        edit.className = "secondary row-action";
-        edit.textContent = "Edit";
+        edit.className = "secondary icon-button";
+        edit.title = "Edit";
+        edit.setAttribute("aria-label", `Edit ${row.hostname}`);
+        edit.append(icon("edit"));
         edit.addEventListener("click", () => editCnameMetadata(row));
         actions.append(edit);
         if (row.status === "stale" || currentState.always_show_delete) {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = "danger row-action";
-          button.textContent = "Delete";
+          button.className = "danger icon-button";
+          button.title = "Delete";
+          button.setAttribute("aria-label", `Delete ${row.hostname}`);
+          button.append(icon("trash"));
           button.addEventListener("click", () => deleteStaleCname(row.hostname));
           actions.append(button);
         }
@@ -252,14 +275,34 @@
       if (column.action === "delete-stale" && (row.status === "stale" || currentState.always_show_delete)) {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "danger row-action";
-        button.textContent = "Delete";
+        button.className = "danger icon-button";
+        button.title = "Delete";
+        button.setAttribute("aria-label", `Delete ${row.hostname}`);
+        button.append(icon("trash"));
         button.addEventListener("click", () => deleteStaleCname(row.hostname));
         td.append(button);
         return td;
       }
       td.textContent = column.action ? "" : text(row[column.key]);
       return td;
+    }
+
+    function icon(name) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      const paths = {
+        edit:["M12 20h9","M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"],
+        trash:["M3 6h18","M8 6V4h8v2","M19 6l-1 14H6L5 6","M10 11v6","M14 11v6"],
+        sun:["M12 4V2","M12 22v-2","M4.93 4.93 3.52 3.52","M20.48 20.48l-1.41-1.41","M4 12H2","M22 12h-2","M4.93 19.07l-1.41 1.41","M20.48 3.52l-1.41 1.41","M8 12a4 4 0 1 0 8 0 4 4 0 0 0-8 0"],
+        moon:["M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z"]
+      };
+      for (const d of paths[name]) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        svg.append(path);
+      }
+      return svg;
     }
 
     function renderTable(target, columns, rows, emptyText) {
@@ -467,6 +510,12 @@
       $("connection-text").textContent = message;
     }
 
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      localStorage.setItem("theme", theme);
+      $("theme-toggle").replaceChildren(icon(theme === "dark" ? "sun" : "moon"));
+    }
+
     function showPanel(id) {
       document.querySelectorAll(".table-panel").forEach((panel) => {
         panel.hidden = panel.id !== id;
@@ -512,10 +561,14 @@
       event.preventDefault();
       addCname($("add-cname-hostname").value.trim(), $("add-cname-target").value.trim());
     });
+    $("theme-toggle").addEventListener("click", () => {
+      applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+    });
     document.querySelectorAll(".tab").forEach((tab) => {
       tab.addEventListener("click", () => showPanel(tab.dataset.tab));
     });
 
+    applyTheme(localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
     connectEvents();
   </script>
 </body>
