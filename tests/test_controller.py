@@ -1,7 +1,7 @@
 import unittest
 
 from app.controller import Controller
-from app.traefik import desired_records, extract_hosts, normalize_host, plan_records
+from app.traefik import desired_records, extract_hosts, normalize_host, plan_records, valid_hostname
 
 
 class RuleExtractionTests(unittest.TestCase):
@@ -109,6 +109,46 @@ class RuleExtractionTests(unittest.TestCase):
             desired_records(services, ["home.prettybaked.com"]),
             {"manual.home.prettybaked.com": "docker-swarm"},
         )
+
+    def test_rejects_malformed_source_hostnames_with_reasons(self):
+        plan = plan_records(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "unifi-dns.enable": "true",
+                            "unifi-dns.source": (
+                                "bad_host.home.prettybaked.com "
+                                "-bad.home.prettybaked.com "
+                                "outside.example.net "
+                                "*.home.prettybaked.com"
+                            ),
+                        },
+                    }
+                }
+            ],
+            ["home.prettybaked.com"],
+        )
+
+        self.assertEqual(plan.desired, {})
+        self.assertEqual(
+            [(ignored.host, ignored.reason) for ignored in plan.ignored],
+            [
+                ("bad_host.home.prettybaked.com", "invalid hostname"),
+                ("-bad.home.prettybaked.com", "invalid hostname"),
+                ("outside.example.net", "outside allowed zones"),
+                ("*.home.prettybaked.com", "wildcard source"),
+            ],
+        )
+
+    def test_valid_hostname_contract(self):
+        self.assertTrue(valid_hostname("app.home.prettybaked.com"))
+        self.assertTrue(valid_hostname("xn--example.home.prettybaked.com"))
+        self.assertFalse(valid_hostname("bad_host.home.prettybaked.com"))
+        self.assertFalse(valid_hostname("-bad.home.prettybaked.com"))
+        self.assertFalse(valid_hostname("bad-.home.prettybaked.com"))
+        self.assertFalse(valid_hostname(""))
 
 
 class ReconcileTests(unittest.TestCase):
