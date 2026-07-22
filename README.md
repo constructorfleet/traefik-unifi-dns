@@ -79,6 +79,12 @@ conflict and no UniFi record is changed for that host.
 | `PORT` | no | `8080` | HTTP UI and health endpoint port. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level. |
 
+Every value-style environment variable also supports a Docker-style `_FILE` companion, such as
+`UNIFI_URL_FILE`, `ALLOWED_ZONES_FILE`, or `DRY_RUN_FILE`. The file contents are read, trimmed,
+and then validated as if the direct environment variable had been set. Setting both `NAME` and
+`NAME_FILE` is rejected at startup. `UNIFI_API_KEY_FILE` remains the file path used to read the
+UniFi API key itself.
+
 ## Deployment
 
 For local development:

@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app.config import Settings
 
@@ -57,6 +59,54 @@ class SettingsTests(unittest.TestCase):
                         **env,
                     }
                 )
+
+    def test_reads_settings_from_file_env_suffixes(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unifi_url_file = root / "unifi-url"
+            zones_file = root / "allowed-zones"
+            dry_run_file = root / "dry-run"
+            unifi_url_file.write_text(" https://unifi.local\n")
+            zones_file.write_text("home.prettybaked.com,home.constructorfleet.stream\n")
+            dry_run_file.write_text("true\n")
+
+            settings = Settings.from_env(
+                {
+                    "UNIFI_URL_FILE": str(unifi_url_file),
+                    "ALLOWED_ZONES_FILE": str(zones_file),
+                    "DRY_RUN_FILE": str(dry_run_file),
+                }
+            )
+
+        self.assertEqual(settings.unifi_url, "https://unifi.local")
+        self.assertEqual(
+            settings.allowed_zones,
+            ("home.prettybaked.com", "home.constructorfleet.stream"),
+        )
+        self.assertTrue(settings.dry_run)
+
+    def test_rejects_env_value_and_file_suffix_together(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "unifi-url"
+            path.write_text("https://from-file.local")
+
+            with self.assertRaises(ValueError):
+                Settings.from_env(
+                    {
+                        "UNIFI_URL": "https://inline.local",
+                        "UNIFI_URL_FILE": str(path),
+                        "ALLOWED_ZONES": "home.prettybaked.com",
+                    }
+                )
+
+    def test_rejects_missing_file_env_suffix_path(self):
+        with self.assertRaises(ValueError):
+            Settings.from_env(
+                {
+                    "UNIFI_URL_FILE": "/missing/nope",
+                    "ALLOWED_ZONES": "home.prettybaked.com",
+                }
+            )
 
 
 if __name__ == "__main__":

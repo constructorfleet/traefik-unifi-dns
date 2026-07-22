@@ -28,21 +28,21 @@ class Settings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         values = os.environ if env is None else env
-        unifi_url = values.get("UNIFI_URL", "").strip()
+        unifi_url = _env_value(values, "UNIFI_URL", "").strip()
         allowed_zones = tuple(
             normalize_host(zone.strip())
-            for zone in values.get("ALLOWED_ZONES", "").split(",")
+            for zone in _env_value(values, "ALLOWED_ZONES", "").split(",")
             if zone.strip()
         )
-        default_target = values.get("DEFAULT_TARGET", "docker-swarm").strip().lower()
-        cname_localdomain = normalize_host(values.get("CNAME_LOCALDOMAIN", "local").strip())
-        dry_run = _parse_bool(values.get("DRY_RUN", "false"), "DRY_RUN")
+        default_target = _env_value(values, "DEFAULT_TARGET", "docker-swarm").strip().lower()
+        cname_localdomain = normalize_host(_env_value(values, "CNAME_LOCALDOMAIN", "local").strip())
+        dry_run = _parse_bool(_env_value(values, "DRY_RUN", "false"), "DRY_RUN")
         reconcile_interval_seconds = _parse_positive_int(
-            values.get("RECONCILE_INTERVAL_SECONDS", "300"),
+            _env_value(values, "RECONCILE_INTERVAL_SECONDS", "300"),
             "RECONCILE_INTERVAL_SECONDS",
         )
-        port = _parse_port(values.get("PORT", "8080"))
-        log_level = values.get("LOG_LEVEL", "INFO").strip().upper()
+        port = _parse_port(_env_value(values, "PORT", "8080"))
+        log_level = _env_value(values, "LOG_LEVEL", "INFO").strip().upper()
 
         if not unifi_url:
             raise ValueError("UNIFI_URL is required")
@@ -59,11 +59,13 @@ class Settings:
             raise ValueError("LOG_LEVEL must be a standard Python logging level name")
 
         return cls(
-            docker_host=values.get("DOCKER_HOST", "unix:///var/run/docker.sock").strip(),
+            docker_host=_env_value(values, "DOCKER_HOST", "unix:///var/run/docker.sock").strip(),
             unifi_url=unifi_url,
             allowed_zones=allowed_zones,
-            state_path=Path(values.get("STATE_PATH", "/state/ownership.json")),
-            unifi_api_key_file=Path(values.get("UNIFI_API_KEY_FILE", "/run/secrets/unifi_api_key")),
+            state_path=Path(_env_value(values, "STATE_PATH", "/state/ownership.json")),
+            unifi_api_key_file=Path(
+                _env_value(values, "UNIFI_API_KEY_FILE", "/run/secrets/unifi_api_key")
+            ),
             default_target=default_target,
             cname_localdomain=cname_localdomain,
             dry_run=dry_run,
@@ -71,6 +73,21 @@ class Settings:
             port=port,
             log_level=log_level,
         )
+
+
+def _env_value(values: Mapping[str, str], name: str, default: str) -> str:
+    file_name = f"{name}_FILE"
+    has_value = name in values and values[name] != ""
+    has_file = file_name in values and values[file_name] != ""
+    if has_value and has_file:
+        raise ValueError(f"{name} and {file_name} cannot both be set")
+    if has_file:
+        path = Path(values[file_name])
+        try:
+            return path.read_text().strip()
+        except OSError as error:
+            raise ValueError(f"{file_name} could not be read: {path}") from error
+    return values.get(name, default)
 
 
 def _parse_bool(value: str, name: str) -> bool:
