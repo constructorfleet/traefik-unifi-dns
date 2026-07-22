@@ -3,13 +3,22 @@
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from .dashboard import dashboard_state, render_dashboard
 
 
 class DashboardHttpServer(ThreadingHTTPServer):
-    def __init__(self, server_address, controller, event_interval_seconds: float = 3):
+    controller: Any
+    event_interval_seconds: float
+
+    def __init__(
+        self,
+        server_address,
+        controller: Any,
+        event_interval_seconds: float = 3,
+    ) -> None:
         super().__init__(server_address, DashboardRequestHandler)
         self.controller = controller
         self.event_interval_seconds = event_interval_seconds
@@ -21,14 +30,14 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True})
             return
         if self.path == "/readyz":
-            ready = bool(self.server.controller.last_reconcile)
+            ready = bool(self._dashboard_server.controller.last_reconcile)
             self._send_json(200 if ready else 503, {"ready": ready})
             return
         if self.path == "/metrics":
             self._send_metrics()
             return
         if self.path == "/api/state":
-            self._send_json(200, dashboard_state(self.server.controller))
+            self._send_json(200, dashboard_state(self._dashboard_server.controller))
             return
         if self.path == "/events":
             self._send_events()
@@ -45,7 +54,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "hostname is required"})
             return
         try:
-            result = self.server.controller.delete_stale_target_cname(hostname)
+            result = self._dashboard_server.controller.delete_stale_target_cname(hostname)
         except ValueError as error:
             self._send_json(409, {"error": str(error)})
             return
@@ -59,7 +68,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _send_metrics(self) -> None:
-        controller = self.server.controller
+        controller = self._dashboard_server.controller
         state = dashboard_state(controller)
         counts = state["counts"]
         metrics = _prometheus_metrics(
@@ -120,11 +129,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"retry: 3000\n")
         while True:
             try:
-                data = json.dumps(dashboard_state(self.server.controller)).encode()
+                data = json.dumps(dashboard_state(self._dashboard_server.controller)).encode()
                 self.wfile.write(b"event: state\n")
                 self.wfile.write(b"data: " + data + b"\n\n")
                 self.wfile.flush()
-                time.sleep(self.server.event_interval_seconds)
+                time.sleep(self._dashboard_server.event_interval_seconds)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 return
 
@@ -137,6 +146,10 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         """Suppress the server's unstructured access log."""
         del format, args
+
+    @property
+    def _dashboard_server(self) -> DashboardHttpServer:
+        return cast(DashboardHttpServer, self.server)
 
 
 def serve(controller, port: int) -> None:
