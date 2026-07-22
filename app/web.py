@@ -70,7 +70,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
     def _send_metrics(self) -> None:
         controller = self._dashboard_server.controller
         state = dashboard_state(controller)
-        counts = state["counts"]
+        counts = cast(dict[str, int], state["counts"])
         metrics = _prometheus_metrics(
             {
                 "ready": (
