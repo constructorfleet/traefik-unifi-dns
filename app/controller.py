@@ -23,10 +23,12 @@ class Controller:
         self.unifi, self.zones, self.ownership = unifi, zones, ownership
         self.default_target, self.localdomain = default_target, localdomain
         self.conflicts, self.last_error, self.last_reconcile = set(), None, None
+        self.ignored, self.claims = (), ()
 
     def reconcile(self, services: list[dict[str, Any]]) -> None:
         plan = plan_records(services, self.zones, self.default_target)
         self.conflicts = plan.conflicts
+        self.ignored, self.claims = plan.ignored, plan.claims
         current = {record["key"]: record for record in self.unifi.list()}
         for host, target in plan.desired.items():
             fq_target = target + "." + self.localdomain

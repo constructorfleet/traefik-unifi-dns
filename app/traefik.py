@@ -14,6 +14,16 @@ class RecordPlan:
     desired: dict[str, str]
     conflicts: set[str]
     ignored: tuple["IgnoredSource", ...] = ()
+    claims: tuple["SourceClaim", ...] = ()
+
+
+@dataclass(frozen=True)
+class SourceClaim:
+    host: str
+    target: str
+    service: str
+    label: str
+    kind: str
 
 
 @dataclass(frozen=True)
@@ -82,6 +92,7 @@ def plan_records(
     """Plan desired hostname ownership from opted-in Traefik service labels."""
     normalized_zones = [normalize_host(zone) for zone in zones]
     claims = defaultdict(set)
+    source_claims = []
     ignored = []
     for service in services:
         spec = service.get("Spec", {})
@@ -95,31 +106,49 @@ def plan_records(
         for host in extract_sources(labels.get("unifi-dns.source")):
             _claim_source(
                 claims,
+                source_claims,
                 ignored,
                 service_name,
                 "unifi-dns.source",
                 host,
                 target,
                 normalized_zones,
+                "manual",
             )
         for key, rule in labels.items():
             if key.startswith("traefik.http.routers.") and key.endswith(".rule"):
                 for host in extract_hosts(rule):
-                    if _allowed(host, normalized_zones):
-                        claims[host].add(target)
+                    _claim_source(
+                        claims,
+                        source_claims,
+                        ignored,
+                        service_name,
+                        key,
+                        host,
+                        target,
+                        normalized_zones,
+                        "traefik",
+                    )
     conflicts = {host for host, targets in claims.items() if len(targets) > 1}
     desired = {host: next(iter(targets)) for host, targets in claims.items() if len(targets) == 1}
-    return RecordPlan(desired=desired, conflicts=conflicts, ignored=tuple(ignored))
+    return RecordPlan(
+        desired=desired,
+        conflicts=conflicts,
+        ignored=tuple(ignored),
+        claims=tuple(source_claims),
+    )
 
 
 def _claim_source(
     claims,
+    source_claims: list[SourceClaim],
     ignored: list[IgnoredSource],
     service_name: str,
     label: str,
     host: str,
     target: str,
     zones: list[str],
+    kind: str,
 ) -> None:
     if "*" in host:
         ignored.append(IgnoredSource(service_name, label, host, "wildcard source"))
@@ -131,6 +160,7 @@ def _claim_source(
         ignored.append(IgnoredSource(service_name, label, host, "outside allowed zones"))
         return
     claims[host].add(target)
+    source_claims.append(SourceClaim(host, target, service_name, label, kind))
 
 
 def _allowed(host: str, zones: list[str]) -> bool:

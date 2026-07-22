@@ -68,6 +68,14 @@ class RuleExtractionTests(unittest.TestCase):
 
         self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
         self.assertEqual(plan.conflicts, {"dup.home.prettybaked.com"})
+        self.assertEqual(
+            [(claim.service, claim.kind, claim.label, claim.target) for claim in plan.claims],
+            [
+                ("app", "traefik", "traefik.http.routers.app.rule", "docker-swarm"),
+                ("dup-a", "traefik", "traefik.http.routers.app.rule", "one"),
+                ("dup-b", "traefik", "traefik.http.routers.app.rule", "two"),
+            ],
+        )
 
     def test_source_label_adds_manual_hosts(self):
         services = [
@@ -157,10 +165,37 @@ class ReconcileTests(unittest.TestCase):
         controller = Controller(api, ["home.prettybaked.com"], {})
         controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
         self.assertEqual(api.created, [("app.home.prettybaked.com", "docker-swarm.local")])
+        self.assertEqual(
+            [(claim.host, claim.service, claim.kind) for claim in controller.claims],
+            [("app.home.prettybaked.com", "app", "traefik")],
+        )
         controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "new-target")])
         self.assertEqual(api.updated, [("app.home.prettybaked.com", "new-target.local")])
         controller.reconcile([])
         self.assertEqual(api.deleted, ["app.home.prettybaked.com"])
+
+    def test_controller_exposes_ignored_sources(self):
+        api = FakeUnifi([])
+        controller = Controller(api, ["home.prettybaked.com"], {})
+        controller.reconcile(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "unifi-dns.enable": "true",
+                            "unifi-dns.source": "bad_host.home.prettybaked.com",
+                        },
+                    }
+                }
+            ]
+        )
+
+        self.assertEqual(api.created, [])
+        self.assertEqual(
+            [(ignored.service, ignored.host, ignored.reason) for ignored in controller.ignored],
+            [("app", "bad_host.home.prettybaked.com", "invalid hostname")],
+        )
 
     def test_preserves_unowned_records_and_api_failure(self):
         api = FakeUnifi(

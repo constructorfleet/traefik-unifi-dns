@@ -29,6 +29,8 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self.server.controller.ownership,
                 self.server.controller.conflicts,
                 self.server.controller.last_error,
+                self.server.controller.ignored,
+                self.server.controller.claims,
             )
         )
 

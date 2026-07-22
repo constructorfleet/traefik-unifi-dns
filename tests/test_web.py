@@ -37,6 +37,8 @@ class WebEndpointTests(unittest.TestCase):
 class FakeController:
     ownership = {"app.home.prettybaked.com": "docker-swarm.local"}
     conflicts = {"dup.home.prettybaked.com"}
+    ignored = ()
+    claims = ()
     last_error = None
     last_reconcile = 1
 
