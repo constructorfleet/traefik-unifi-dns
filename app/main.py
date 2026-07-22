@@ -18,6 +18,7 @@ def build_controller(settings: Settings, state_store: JsonStateStore) -> Control
         settings.default_target,
         settings.cname_localdomain,
         settings.dry_run,
+        settings.require_unifi_dns_enable,
     )
 
 

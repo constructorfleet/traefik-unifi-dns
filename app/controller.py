@@ -20,16 +20,23 @@ class Controller:
         default_target: str = "docker-swarm",
         localdomain: str = "local",
         dry_run: bool = False,
+        require_enable_label: bool = True,
     ) -> None:
         self.unifi, self.zones, self.ownership = unifi, zones, ownership
         self.default_target, self.localdomain = default_target, localdomain
         self.dry_run = dry_run
+        self.require_enable_label = require_enable_label
         self.conflicts, self.last_error, self.last_reconcile = set(), None, None
         self.ignored, self.claims = (), ()
         self.plan = RecordPlan(desired={}, conflicts=set())
 
     def reconcile(self, services: list[dict[str, Any]]) -> None:
-        plan = plan_records(services, self.zones, self.default_target)
+        plan = plan_records(
+            services,
+            self.zones,
+            self.default_target,
+            self.require_enable_label,
+        )
         self.plan = plan
         self.conflicts = plan.conflicts
         self.ignored, self.claims = plan.ignored, plan.claims
@@ -50,6 +57,7 @@ class Controller:
                     "unifi_records": len(records),
                     "owned_records": len(self.ownership),
                     "dry_run": self.dry_run,
+                    "require_enable_label": self.require_enable_label,
                 }
             )
         )

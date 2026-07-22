@@ -85,9 +85,10 @@ def desired_records(
     zones: tuple[str, ...] | list[str],
     default_target: str = "docker-swarm",
     with_conflicts: bool = False,
+    require_enable_label: bool = True,
 ):
     """Produce desired hostname -> CNAME target, refusing ambiguous ownership."""
-    plan = plan_records(services, zones, default_target)
+    plan = plan_records(services, zones, default_target, require_enable_label)
     return (plan.desired, plan.conflicts) if with_conflicts else plan.desired
 
 
@@ -95,6 +96,7 @@ def plan_records(
     services: list[dict[str, Any]],
     zones: tuple[str, ...] | list[str],
     default_target: str = "docker-swarm",
+    require_enable_label: bool = True,
 ) -> RecordPlan:
     """Plan desired hostname ownership from opted-in Traefik service labels."""
     normalized_zones = [normalize_host(zone) for zone in zones]
@@ -113,7 +115,7 @@ def plan_records(
         )
         if has_traefik_rules:
             services_with_traefik_rules += 1
-        if labels.get("unifi-dns.enable", "").lower() != "true":
+        if require_enable_label and labels.get("unifi-dns.enable", "").lower() != "true":
             skipped_services += 1
             continue
         enabled_services += 1

@@ -8,6 +8,7 @@ services:
       UNIFI_URL: ${UNIFI_URL:?set UNIFI_URL}
       ALLOWED_ZONES: ${ALLOWED_ZONES:-home.prettybaked.com,home.constructorfleet.stream}
       DRY_RUN: ${DRY_RUN:-false}
+      REQUIRE_UNIFI_DNS_ENABLE: ${REQUIRE_UNIFI_DNS_ENABLE:-true}
     secrets:
       - source: unifi_dns_traefik_api_key
         target: unifi_api_key

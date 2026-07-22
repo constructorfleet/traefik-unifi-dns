@@ -78,6 +78,7 @@ conflict and no UniFi record is changed for that host.
 | `DEFAULT_TARGET` | no | `docker-swarm` | CNAME target label fallback. |
 | `CNAME_LOCALDOMAIN` | no | `local` | Suffix appended to target names. |
 | `DRY_RUN` | no | `false` | Plan records and report state without mutating UniFi DNS or ownership state. |
+| `REQUIRE_UNIFI_DNS_ENABLE` | no | `true` | Require `unifi-dns.enable: "true"` before reading a service. Set to `false` to process matching Traefik rules without the opt-in label. `DRY_RUN` still prevents mutations. |
 | `RECONCILE_INTERVAL_SECONDS` | no | `300` | Maximum time between full reconciles while watching events. |
 | `PORT` | no | `8080` | HTTP UI and health endpoint port. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level. |

@@ -102,6 +102,28 @@ class RuleExtractionTests(unittest.TestCase):
         self.assertEqual(plan.skipped_services, 1)
         self.assertEqual(plan.services_with_traefik_rules, 1)
 
+    def test_bypass_unifi_opt_in_processes_traefik_rules(self):
+        plan = plan_records(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "traefik.enable": "true",
+                            "traefik.http.routers.app.rule": ("Host(`app.home.prettybaked.com`)"),
+                        },
+                    }
+                }
+            ],
+            ["home.prettybaked.com"],
+            require_enable_label=False,
+        )
+
+        self.assertEqual(plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+        self.assertEqual(plan.enabled_services, 1)
+        self.assertEqual(plan.skipped_services, 0)
+        self.assertEqual(plan.services_with_traefik_rules, 1)
+
     def test_source_label_adds_manual_hosts(self):
         services = [
             {
@@ -307,6 +329,34 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(api.deleted, [])
         self.assertEqual(ownership, {})
         self.assertEqual(controller.ownership, {})
+        self.assertEqual(controller.plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
+
+    def test_dry_run_still_applies_when_enable_label_is_not_required(self):
+        api = FakeUnifi([])
+        ownership = {}
+        controller = Controller(
+            api,
+            ["home.prettybaked.com"],
+            ownership,
+            dry_run=True,
+            require_enable_label=False,
+        )
+
+        controller.reconcile(
+            [
+                {
+                    "Spec": {
+                        "Name": "app",
+                        "Labels": {
+                            "traefik.http.routers.app.rule": "Host(`app.home.prettybaked.com`)",
+                        },
+                    }
+                }
+            ]
+        )
+
+        self.assertEqual(api.created, [])
+        self.assertEqual(ownership, {})
         self.assertEqual(controller.plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
 
     def test_preserves_unowned_records_and_api_failure(self):

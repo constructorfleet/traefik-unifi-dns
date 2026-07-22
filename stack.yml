@@ -8,6 +8,7 @@ services:
       DEFAULT_TARGET: ${DEFAULT_TARGET:-docker-swarm}
       CNAME_LOCALDOMAIN: ${CNAME_LOCALDOMAIN:-local}
       DRY_RUN: ${DRY_RUN:-false}
+      REQUIRE_UNIFI_DNS_ENABLE: ${REQUIRE_UNIFI_DNS_ENABLE:-true}
       RECONCILE_INTERVAL_SECONDS: ${RECONCILE_INTERVAL_SECONDS:-300}
     secrets:
       - source: unifi_dns_traefik_api_key

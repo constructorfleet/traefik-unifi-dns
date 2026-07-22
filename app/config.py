@@ -21,6 +21,7 @@ class Settings:
     default_target: str
     cname_localdomain: str
     dry_run: bool
+    require_unifi_dns_enable: bool
     reconcile_interval_seconds: int
     port: int
     log_level: str
@@ -37,6 +38,10 @@ class Settings:
         default_target = _env_value(values, "DEFAULT_TARGET", "docker-swarm").strip().lower()
         cname_localdomain = normalize_host(_env_value(values, "CNAME_LOCALDOMAIN", "local").strip())
         dry_run = _parse_bool(_env_value(values, "DRY_RUN", "false"), "DRY_RUN")
+        require_unifi_dns_enable = _parse_bool(
+            _env_value(values, "REQUIRE_UNIFI_DNS_ENABLE", "true"),
+            "REQUIRE_UNIFI_DNS_ENABLE",
+        )
         reconcile_interval_seconds = _parse_positive_int(
             _env_value(values, "RECONCILE_INTERVAL_SECONDS", "300"),
             "RECONCILE_INTERVAL_SECONDS",
@@ -69,6 +74,7 @@ class Settings:
             default_target=default_target,
             cname_localdomain=cname_localdomain,
             dry_run=dry_run,
+            require_unifi_dns_enable=require_unifi_dns_enable,
             reconcile_interval_seconds=reconcile_interval_seconds,
             port=port,
             log_level=log_level,

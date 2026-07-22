@@ -14,6 +14,7 @@ class SettingsTests(unittest.TestCase):
                 "DEFAULT_TARGET": "Edge",
                 "CNAME_LOCALDOMAIN": "Lan.",
                 "DRY_RUN": "yes",
+                "REQUIRE_UNIFI_DNS_ENABLE": "false",
                 "RECONCILE_INTERVAL_SECONDS": "60",
                 "PORT": "8081",
                 "LOG_LEVEL": "debug",
@@ -27,6 +28,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.default_target, "edge")
         self.assertEqual(settings.cname_localdomain, "lan")
         self.assertTrue(settings.dry_run)
+        self.assertFalse(settings.require_unifi_dns_enable)
         self.assertEqual(settings.log_level, "DEBUG")
 
     def test_rejects_invalid_dns_and_target_values(self):
