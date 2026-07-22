@@ -389,6 +389,67 @@ class ReconcileTests(unittest.TestCase):
         self.assertEqual(ownership, {})
         self.assertEqual(controller.plan.desired, {"app.home.prettybaked.com": "docker-swarm"})
 
+    def test_delete_stale_target_cname_deletes_unifi_record(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "old.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "type": "cname",
+                }
+            ]
+        )
+        controller = Controller(api, ["home.prettybaked.com"], {})
+        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+
+        result = controller.delete_stale_target_cname("old.home.prettybaked.com")
+
+        self.assertEqual(result, "deleted")
+        self.assertEqual(api.deleted, ["old.home.prettybaked.com"])
+        self.assertNotIn(
+            "old.home.prettybaked.com",
+            {record["key"] for record in controller.unifi_records},
+        )
+
+    def test_delete_stale_target_cname_rejects_current_record(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "app.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "type": "cname",
+                }
+            ]
+        )
+        controller = Controller(api, ["home.prettybaked.com"], {})
+        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+
+        with self.assertRaises(ValueError):
+            controller.delete_stale_target_cname("app.home.prettybaked.com")
+
+        self.assertEqual(api.deleted, [])
+
+    def test_delete_stale_target_cname_respects_dry_run(self):
+        api = FakeUnifi(
+            [
+                {
+                    "key": "old.home.prettybaked.com",
+                    "value": "docker-swarm.local",
+                    "type": "cname",
+                }
+            ]
+        )
+        controller = Controller(api, ["home.prettybaked.com"], {}, dry_run=True)
+        controller.reconcile([service("app", "Host(`app.home.prettybaked.com`)", "docker-swarm")])
+
+        with self.assertLogs("app.controller", level="INFO") as logs:
+            result = controller.delete_stale_target_cname("old.home.prettybaked.com")
+
+        self.assertEqual(result, "dry_run")
+        self.assertEqual(api.deleted, [])
+        self.assertIn('"action": "delete_stale_target_cname"', "\n".join(logs.output))
+        self.assertIn('"result": "dry_run"', "\n".join(logs.output))
+
     def test_preserves_unowned_records_and_api_failure(self):
         api = FakeUnifi(
             [{"key": "manual.home.prettybaked.com", "value": "manual.local"}], fail_create=True

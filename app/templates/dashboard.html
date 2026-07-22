@@ -90,6 +90,8 @@
     }
     button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
     button:hover{filter:brightness(.96)}
+    button.danger{background:var(--warn);border-color:var(--warn)}
+    .row-action{width:auto;min-height:30px;padding:5px 9px;font-size:12px}
     .panel{overflow:hidden}
     .table-panel[hidden]{display:none}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--line)}
@@ -204,9 +206,18 @@
       return value === null || value === undefined || value === "" ? "None" : String(value);
     }
 
-    function cell(value) {
+    function cell(column, row) {
       const td = document.createElement("td");
-      td.textContent = text(value);
+      if (column.action === "delete-stale" && row.status === "stale") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "danger row-action";
+        button.textContent = "Delete";
+        button.addEventListener("click", () => deleteStaleCname(row.hostname));
+        td.append(button);
+        return td;
+      }
+      td.textContent = column.action ? "" : text(row[column.key]);
       return td;
     }
 
@@ -232,7 +243,7 @@
       const tbody = document.createElement("tbody");
       for (const row of rows) {
         const tr = document.createElement("tr");
-        for (const column of columns) tr.append(cell(row[column.key]));
+        for (const column of columns) tr.append(cell(column, row));
         tbody.append(tr);
       }
       table.append(thead, tbody);
@@ -316,7 +327,8 @@
         {key:"target", label:"CNAME target"},
         {key:"status", label:"Status"},
         {key:"stack", label:"Stack"},
-        {key:"service", label:"Service"}
+        {key:"service", label:"Service"},
+        {key:"actions", label:"Actions", action:"delete-stale"}
       ], targetCnames, "No UniFi CNAMEs point at current DNS targets");
       renderTable("owned-records", [
         {key:"hostname", label:"Hostname"},
@@ -355,6 +367,19 @@
     async function fetchState() {
       const response = await fetch("/api/state", {cache:"no-store"});
       renderState(await response.json());
+    }
+
+    async function deleteStaleCname(hostname) {
+      if (!confirm(`Delete stale CNAME ${hostname}?`)) return;
+      const response = await fetch(`/api/stale-cname?hostname=${encodeURIComponent(hostname)}`, {
+        method:"DELETE"
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        alert(body.error || "Delete failed");
+        return;
+      }
+      await fetchState();
     }
 
     function setConnection(state, message) {

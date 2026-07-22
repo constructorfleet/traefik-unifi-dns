@@ -15,6 +15,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("service-filter", html)
         self.assertIn("url-filter", html)
         self.assertIn('data-tab="target-cnames-panel"', html)
+        self.assertIn("deleteStaleCname", html)
+        self.assertIn('action:"delete-stale"', html)
         self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)

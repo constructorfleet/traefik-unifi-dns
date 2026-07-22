@@ -63,6 +63,7 @@ class Controller:
                 }
             )
         )
+
         for host, target in plan.desired.items():
             fq_target = target + "." + self.localdomain
             record = current.get(host)
@@ -139,3 +140,44 @@ class Controller:
                 }
             )
         )
+
+    def delete_stale_target_cname(self, hostname: str) -> str:
+        record = next(
+            (candidate for candidate in self.unifi_records if candidate.get("key") == hostname),
+            None,
+        )
+        desired_targets = {f"{target}.{self.localdomain}" for target in self.plan.desired.values()}
+        if (
+            record is None
+            or str(record.get("type", "cname")).lower() != "cname"
+            or record.get("value") not in desired_targets
+            or hostname in self.plan.desired
+        ):
+            raise ValueError("hostname is not a stale target CNAME")
+        if self.dry_run:
+            LOG.info(
+                json.dumps(
+                    {
+                        "hostname": hostname,
+                        "target": record.get("value"),
+                        "action": "delete_stale_target_cname",
+                        "result": "dry_run",
+                    }
+                )
+            )
+            return "dry_run"
+        self.unifi.delete(hostname)
+        self.unifi_records = tuple(
+            candidate for candidate in self.unifi_records if candidate.get("key") != hostname
+        )
+        LOG.info(
+            json.dumps(
+                {
+                    "hostname": hostname,
+                    "target": record.get("value"),
+                    "action": "delete_stale_target_cname",
+                    "result": "ok",
+                }
+            )
+        )
+        return "deleted"

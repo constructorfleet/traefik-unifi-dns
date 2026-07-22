@@ -2,6 +2,7 @@
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 
 from .dashboard import dashboard_state, render_dashboard
 
@@ -31,6 +32,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._send_event(dashboard_state(self.server.controller))
             return
         self._send_html(render_dashboard())
+
+    def do_DELETE(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/stale-cname":
+            self._send_json(404, {"error": "not found"})
+            return
+        hostname = parse_qs(parsed.query).get("hostname", [""])[0].strip()
+        if not hostname:
+            self._send_json(400, {"error": "hostname is required"})
+            return
+        try:
+            result = self.server.controller.delete_stale_target_cname(hostname)
+        except ValueError as error:
+            self._send_json(409, {"error": str(error)})
+            return
+        self._send_json(200, {"hostname": hostname, "result": result})
 
     def _send_json(self, status: int, body: dict[str, object]) -> None:
         data = json.dumps(body).encode()
