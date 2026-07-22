@@ -16,6 +16,7 @@
       --accent-soft:#e6f4f1;
       --warn:#b42318;
       --warn-soft:#fff1f0;
+      --table-head:#eef3f8;
       --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 24px rgba(16,24,40,.08);
     }
     [data-theme="dark"]{
@@ -29,6 +30,7 @@
       --accent-soft:#12332f;
       --warn:#fb7185;
       --warn-soft:#3b1720;
+      --table-head:#1d2630;
       --shadow:0 1px 2px rgba(0,0,0,.32),0 10px 24px rgba(0,0,0,.28);
     }
     *{box-sizing:border-box}
@@ -48,7 +50,12 @@
     }
     [data-theme="dark"] header{background:rgba(15,20,25,.94)}
     .shell{max-width:1180px;margin:0 auto;padding:20px}
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+    .header-main{display:grid;gap:10px;min-width:0}
+    .header-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;color:var(--muted);font-size:13px}
+    .meta-item{display:flex;align-items:center;gap:6px;min-width:0}
+    .meta-label{font-weight:700;color:var(--text)}
+    .meta-value{overflow-wrap:anywhere}
     h1{margin:0;font-size:22px;font-weight:700;letter-spacing:0}
     h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:0}
     .subtitle{margin:4px 0 0;color:var(--muted)}
@@ -118,7 +125,7 @@
     .table-wrap{overflow:auto}
     table{width:100%;border-collapse:collapse}
     th,td{padding:11px 16px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-    th{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:#fbfcfe}
+    th{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--table-head)}
     td{font-size:13px}
     code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
     .empty{padding:22px 16px;color:var(--muted)}
@@ -126,6 +133,7 @@
     @media (max-width:760px){
       .shell{padding:14px}
       .topbar{align-items:flex-start;flex-direction:column}
+      .header-actions{width:100%;justify-content:space-between}
       .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
       .filters{grid-template-columns:1fr}
       .add-cname{grid-template-columns:1fr}
@@ -136,9 +144,16 @@
 <body>
   <header>
     <div class="shell topbar">
-      <div>
-        <h1>UniFi DNS Traefik</h1>
-        <p class="subtitle">Live reconciliation state from Docker service labels and UniFi static DNS.</p>
+      <div class="header-main">
+        <div>
+          <h1>UniFi DNS Traefik</h1>
+          <p class="subtitle">Live reconciliation state from Docker service labels and UniFi static DNS.</p>
+        </div>
+        <div class="header-meta" aria-label="Controller status">
+          <span id="dry-run" class="badge">Mode unknown</span>
+          <span class="meta-item"><span class="meta-label">Last reconcile</span><span id="last-reconcile" class="meta-value">Never</span></span>
+          <span class="meta-item"><span class="meta-label">Last error</span><span id="last-error" class="meta-value">None</span></span>
+        </div>
       </div>
       <div class="header-actions">
         <button id="theme-toggle" class="secondary icon-button" type="button" aria-label="Toggle dark theme" title="Toggle dark theme"></button>
@@ -154,27 +169,6 @@
       <div class="card"><div class="label">Stale Target CNAMEs</div><div id="stale-cname-count" class="value">0</div></div>
       <div class="card"><div class="label">Conflicts</div><div id="conflicts-count" class="value">0</div></div>
       <div class="card"><div class="label">Ignored</div><div id="ignored-count" class="value">0</div></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Filters</h2>
-        <span id="filter-summary" class="panel-note">Showing all rows</span>
-      </div>
-      <div class="filters">
-        <div class="field">
-          <label for="url-filter">URL</label>
-          <input id="url-filter" type="search" placeholder="Filter hostnames">
-        </div>
-        <div class="field">
-          <label for="stack-filter">Stack</label>
-          <select id="stack-filter"><option value="">All stacks</option></select>
-        </div>
-        <div class="field">
-          <label for="service-filter">Service</label>
-          <select id="service-filter"><option value="">All services</option></select>
-        </div>
-        <button id="clear-filters" type="button">Clear</button>
-      </div>
     </section>
     <section class="panel">
       <div class="panel-head">
@@ -195,16 +189,23 @@
     </section>
     <section class="panel">
       <div class="panel-head">
-        <h2>Status</h2>
-        <span id="dry-run" class="badge">Dry run unknown</span>
+        <h2>Filters</h2>
+        <span id="filter-summary" class="panel-note">Showing all rows</span>
       </div>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr><th>Last reconcile</th><td id="last-reconcile">Never</td></tr>
-            <tr><th>Last error</th><td id="last-error">None</td></tr>
-          </tbody>
-        </table>
+      <div class="filters">
+        <div class="field">
+          <label for="url-filter">URL</label>
+          <input id="url-filter" type="search" placeholder="Filter hostnames">
+        </div>
+        <div class="field">
+          <label for="stack-filter">Stack</label>
+          <select id="stack-filter"><option value="">All stacks</option></select>
+        </div>
+        <div class="field">
+          <label for="service-filter">Service</label>
+          <select id="service-filter"><option value="">All services</option></select>
+        </div>
+        <button id="clear-filters" type="button">Clear</button>
       </div>
     </section>
     <nav class="tabs" aria-label="Record views">
@@ -440,7 +441,7 @@
 
     function renderState(state) {
       currentState = state;
-      $("dry-run").textContent = state.dry_run ? "Dry run enabled" : "Dry run disabled";
+      $("dry-run").textContent = state.dry_run ? "Dry run" : "Live mode";
       $("dry-run").className = state.dry_run ? "badge warn" : "badge";
       $("last-reconcile").textContent = state.last_reconcile ? new Date(state.last_reconcile * 1000).toLocaleString() : "Never";
       $("last-error").textContent = text(state.last_error);

@@ -29,6 +29,13 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)
+        self.assertIn("--table-head:#eef3f8", html)
+        self.assertIn("--table-head:#1d2630", html)
+        self.assertIn("Controller status", html)
+        self.assertIn('state.dry_run ? "Dry run" : "Live mode"', html)
+        self.assertNotIn("<h2>Status</h2>", html)
+        self.assertLess(html.index('id="add-cname-form"'), html.index('id="filter-summary"'))
+        self.assertLess(html.index('id="filter-summary"'), html.index('aria-label="Record views"'))
 
     def test_dashboard_state_serializes_controller(self):
         state = dashboard_state(FakeController())
