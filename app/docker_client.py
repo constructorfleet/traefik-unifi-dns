@@ -19,12 +19,12 @@ class DockerClient:
         response.raise_for_status()
         return response.json()
 
-    def stream_service_events(self):
+    def stream_service_events(self, read_timeout_seconds: float = 70):
         return self.session.get(
             f"{self.base_url}/events",
             params={"filters": json.dumps({"type": ["service"]})},
             stream=True,
-            timeout=70,
+            timeout=(15, read_timeout_seconds),
         )
 
     @staticmethod

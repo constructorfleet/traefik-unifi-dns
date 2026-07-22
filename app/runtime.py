@@ -6,6 +6,8 @@ import json
 import logging
 import time
 
+import requests
+
 from .controller import Controller
 from .docker_client import DockerClient
 from .state_store import JsonStateStore
@@ -55,7 +57,9 @@ class ReconcileWorker:
         )
 
     def wait_for_service_events(self) -> None:
-        response = self.docker.stream_service_events()
+        response = self.docker.stream_service_events(
+            read_timeout_seconds=self.reconcile_interval_seconds
+        )
         response.raise_for_status()
         LOG.info(
             json.dumps(
@@ -68,9 +72,20 @@ class ReconcileWorker:
         )
         deadline = time.monotonic() + self.reconcile_interval_seconds
         try:
-            for _line in response.iter_lines():
-                if time.monotonic() >= deadline:
-                    break
-                time.sleep(self.debounce_seconds)
+            try:
+                for _line in response.iter_lines():
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(self.debounce_seconds)
+            except requests.exceptions.RequestException as error:
+                LOG.info(
+                    json.dumps(
+                        {
+                            "action": "docker_events",
+                            "result": "reconnect",
+                            "reason": str(error),
+                        }
+                    )
+                )
         finally:
             response.close()

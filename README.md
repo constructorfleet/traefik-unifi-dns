@@ -123,6 +123,9 @@ The container exposes:
 - `/readyz`: readiness after the first successful reconcile.
 - `/metrics`: Prometheus-compatible gauges.
 
+The Docker event stream is long-lived and may reconnect after an idle read timeout. This is logged
+as `{"action":"docker_events","result":"reconnect"}` and the next loop performs a fresh reconcile.
+
 ## Development
 
 Install dependencies:
