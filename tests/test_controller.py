@@ -100,6 +100,59 @@ class RuleExtractionTests(unittest.TestCase):
             },
         )
 
+    def test_source_target_suffix_overrides_service_target(self):
+        services = [
+            {
+                "Spec": {
+                    "Name": "app",
+                    "Labels": {
+                        "unifi-dns.enable": "true",
+                        "unifi-dns.target": "docker-swarm",
+                        "unifi-dns.source.edge": "edge.home.prettybaked.com",
+                        "unifi-dns.source.media": "media.home.prettybaked.com",
+                    },
+                }
+            }
+        ]
+
+        plan = plan_records(services, ["home.prettybaked.com"])
+
+        self.assertEqual(
+            plan.desired,
+            {
+                "edge.home.prettybaked.com": "edge",
+                "media.home.prettybaked.com": "media",
+            },
+        )
+        self.assertEqual(
+            [(claim.host, claim.target, claim.label) for claim in plan.claims],
+            [
+                ("edge.home.prettybaked.com", "edge", "unifi-dns.source.edge"),
+                ("media.home.prettybaked.com", "media", "unifi-dns.source.media"),
+            ],
+        )
+
+    def test_invalid_source_target_suffix_is_ignored(self):
+        services = [
+            {
+                "Spec": {
+                    "Name": "app",
+                    "Labels": {
+                        "unifi-dns.enable": "true",
+                        "unifi-dns.source.bad_target": "app.home.prettybaked.com",
+                    },
+                }
+            }
+        ]
+
+        plan = plan_records(services, ["home.prettybaked.com"])
+
+        self.assertEqual(plan.desired, {})
+        self.assertEqual(
+            [(ignored.label, ignored.host, ignored.reason) for ignored in plan.ignored],
+            [("unifi-dns.source.bad_target", "app.home.prettybaked.com", "invalid target")],
+        )
+
     def test_source_label_still_requires_allowed_zone(self):
         services = [
             {

@@ -48,6 +48,10 @@ def valid_hostname(host: str) -> bool:
     )
 
 
+def valid_target(target: str) -> bool:
+    return re.fullmatch(r"[a-z0-9][a-z0-9-]*", target) is not None
+
+
 def extract_hosts(rule: object) -> list[str]:
     """Return only literal, non-wildcard Host() arguments from a Traefik rule."""
     if not isinstance(rule, str):
@@ -101,20 +105,27 @@ def plan_records(
         if labels.get("unifi-dns.enable", "").lower() != "true":
             continue
         target = labels.get("unifi-dns.target", default_target).strip().lower()
-        if not target or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", target):
+        if not target or not valid_target(target):
             continue
-        for host in extract_sources(labels.get("unifi-dns.source")):
-            _claim_source(
-                claims,
-                source_claims,
-                ignored,
-                service_name,
-                "unifi-dns.source",
-                host,
-                target,
-                normalized_zones,
-                "manual",
-            )
+        for key, source in labels.items():
+            source_target = _source_label_target(key, target)
+            if source_target is None:
+                continue
+            for host in extract_sources(source):
+                if not valid_target(source_target):
+                    ignored.append(IgnoredSource(service_name, key, host, "invalid target"))
+                    continue
+                _claim_source(
+                    claims,
+                    source_claims,
+                    ignored,
+                    service_name,
+                    key,
+                    host,
+                    source_target,
+                    normalized_zones,
+                    "manual",
+                )
         for key, rule in labels.items():
             if key.startswith("traefik.http.routers.") and key.endswith(".rule"):
                 for host in extract_hosts(rule):
@@ -161,6 +172,15 @@ def _claim_source(
         return
     claims[host].add(target)
     source_claims.append(SourceClaim(host, target, service_name, label, kind))
+
+
+def _source_label_target(label: str, default_target: str) -> str | None:
+    if label == "unifi-dns.source":
+        return default_target
+    prefix = "unifi-dns.source."
+    if label.startswith(prefix):
+        return label[len(prefix) :].strip().lower()
+    return None
 
 
 def _allowed(host: str, zones: list[str]) -> bool:
