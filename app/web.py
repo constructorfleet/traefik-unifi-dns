@@ -60,12 +60,54 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
     def _send_metrics(self) -> None:
         controller = self.server.controller
-        metrics = (
-            f"unifi_dns_traefik_conflicts {len(controller.conflicts)}\n"
-            f"unifi_dns_traefik_owned_records {len(controller.ownership)}\n"
-            f"unifi_dns_traefik_dry_run {int(controller.dry_run)}\n"
+        state = dashboard_state(controller)
+        counts = state["counts"]
+        metrics = _prometheus_metrics(
+            {
+                "ready": (
+                    "Whether the controller has completed a successful reconcile.",
+                    int(bool(controller.last_reconcile)),
+                ),
+                "dry_run": (
+                    "Whether UniFi mutations are disabled.",
+                    int(controller.dry_run),
+                ),
+                "last_reconcile_timestamp_seconds": (
+                    "Last successful reconcile Unix timestamp.",
+                    controller.last_reconcile or 0,
+                ),
+                "last_error": (
+                    "Whether the last reconcile ended with an error.",
+                    int(bool(controller.last_error)),
+                ),
+                "owned_records": (
+                    "Controller-owned UniFi DNS records.",
+                    counts["owned"],
+                ),
+                "claims": (
+                    "Active DNS source claims parsed from labels.",
+                    counts["claims"],
+                ),
+                "conflicts": (
+                    "Hostnames claimed by multiple targets.",
+                    counts["conflicts"],
+                ),
+                "ignored_sources": (
+                    "Ignored DNS sources from invalid or disallowed labels.",
+                    counts["ignored"],
+                ),
+                "unifi_target_cnames": (
+                    "UniFi CNAME records pointing at active DNS targets.",
+                    counts["unifi_target_records"],
+                ),
+                "stale_unifi_target_cnames": (
+                    "UniFi target CNAMEs not present in the current desired plan.",
+                    counts["stale_unifi_target_records"],
+                ),
+            }
         )
         self.send_response(200)
+        self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
         self.end_headers()
         self.wfile.write(metrics.encode())
 
@@ -99,3 +141,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
 
 def serve(controller, port: int) -> None:
     DashboardHttpServer(("", port), controller).serve_forever()
+
+
+def _prometheus_metrics(metrics: dict[str, tuple[str, object]]) -> str:
+    lines = []
+    for suffix, (help_text, value) in metrics.items():
+        name = f"unifi_dns_traefik_{suffix}"
+        lines.extend(
+            [
+                f"# HELP {name} {help_text}",
+                f"# TYPE {name} gauge",
+                f"{name} {value}",
+            ]
+        )
+    return "\n".join([*lines, ""])
