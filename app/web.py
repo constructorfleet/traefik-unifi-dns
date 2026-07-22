@@ -1,6 +1,7 @@
 """HTTP endpoints for health checks, metrics, and the controller dashboard."""
 
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -8,9 +9,10 @@ from .dashboard import dashboard_state, render_dashboard
 
 
 class DashboardHttpServer(ThreadingHTTPServer):
-    def __init__(self, server_address, controller):
+    def __init__(self, server_address, controller, event_interval_seconds: float = 3):
         super().__init__(server_address, DashboardRequestHandler)
         self.controller = controller
+        self.event_interval_seconds = event_interval_seconds
 
 
 class DashboardRequestHandler(BaseHTTPRequestHandler):
@@ -29,7 +31,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, dashboard_state(self.server.controller))
             return
         if self.path == "/events":
-            self._send_event(dashboard_state(self.server.controller))
+            self._send_events()
             return
         self._send_html(render_dashboard())
 
@@ -67,16 +69,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(metrics.encode())
 
-    def _send_event(self, body: dict[str, object]) -> None:
-        data = json.dumps(body).encode()
+    def _send_events(self) -> None:
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Connection", "close")
+        self.send_header("Connection", "keep-alive")
         self.end_headers()
         self.wfile.write(b"retry: 3000\n")
-        self.wfile.write(b"event: state\n")
-        self.wfile.write(b"data: " + data + b"\n\n")
+        while True:
+            try:
+                data = json.dumps(dashboard_state(self.server.controller)).encode()
+                self.wfile.write(b"event: state\n")
+                self.wfile.write(b"data: " + data + b"\n\n")
+                self.wfile.flush()
+                time.sleep(self.server.event_interval_seconds)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                return
 
     def _send_html(self, html: str) -> None:
         self.send_response(200)

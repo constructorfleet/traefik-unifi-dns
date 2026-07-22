@@ -20,8 +20,7 @@ class WebEndpointTests(unittest.TestCase):
             self.assertResponse(server, "/", 200, b"new EventSource")
             self.assertResponse(server, "/api/state", 200, b'"owned_records"')
             self.assertResponse(server, "/api/state", 200, b"app.home.prettybaked.com")
-            self.assertResponse(server, "/events", 200, b"event: state")
-            self.assertResponse(server, "/events", 200, b"data: ")
+            self.assertEventStream(server)
         finally:
             server.shutdown()
             server.server_close()
@@ -38,6 +37,23 @@ class WebEndpointTests(unittest.TestCase):
 
         self.assertEqual(response.status, status)
         self.assertIn(expected_body_fragment, body)
+
+    def assertEventStream(self, server):
+        connection = http.client.HTTPConnection(*server.server_address, timeout=5)
+        try:
+            connection.request("GET", "/events")
+            response = connection.getresponse()
+            retry = response.fp.readline()
+            event = response.fp.readline()
+            data = response.fp.readline()
+        finally:
+            connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Content-Type"), "text/event-stream")
+        self.assertEqual(retry, b"retry: 3000\n")
+        self.assertEqual(event, b"event: state\n")
+        self.assertIn(b'"owned_records"', data)
 
     def test_delete_stale_cname_route_delegates_to_controller(self):
         controller = FakeController()
