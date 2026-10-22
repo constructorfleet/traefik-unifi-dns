@@ -2,8 +2,8 @@
 
 import json
 import time
-from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
