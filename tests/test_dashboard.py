@@ -29,7 +29,7 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("showPanel", html)
         self.assertIn("owned-records", html)
         self.assertIn("Source Claims", html)
-        self.assertIn("--table-head:#eef3f8", html)
+        self.assertIn("--table-head:#f4f7f8", html)
         self.assertIn("--table-head:#1d2630", html)
         self.assertIn("Controller status", html)
         self.assertIn('state.dry_run ? "Dry run" : "Live mode"', html)

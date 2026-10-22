@@ -231,7 +231,7 @@ class WebEndpointTests(unittest.TestCase):
         self.assertEqual(api_status, 401)
         self.assertEqual(json.loads(api_body), {"error": "authentication required"})
         self.assertEqual(auth_status, 200)
-        self.assertIn(b"UniFi DNS Traefik", auth_body)
+        self.assertIn(b"Constructor Fleet | UniFi DNS", auth_body)
 
     def test_oidc_login_callback_and_logout_routes_manage_cookies(self):
         controller = FakeController()
