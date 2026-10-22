@@ -1,0 +1,4 @@
+REGISTRY=docker.home.prettybaked.com
+REPOSITORY=ajanis/traefik-unifi-dns
+VERSION=2026.10.14.1
+PLATFORMS=linux/amd64,linux/arm64

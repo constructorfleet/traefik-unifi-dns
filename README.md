@@ -140,12 +140,20 @@ For local development:
 docker compose up --build
 ```
 
-For Swarm/GitOps deployment, build and publish an image first, then deploy `stack.yml`:
+For Swarm/GitOps deployment, build and publish an image first, then deploy `stack.yml`.
+From the homelab repository root, publish to the configured private registry with the shared
+image builder:
 
 ```bash
-export IMAGE=ghcr.io/your-org/unifi-dns-traefik:sha
+docker-images/build.sh docker-images/traefik-unifi-dns
+export IMAGE=docker.home.prettybaked.com/ajanis/traefik-unifi-dns:latest
 docker stack deploy -c stack.yml unifi-dns-traefik
 ```
+
+The image's `RELEASE` file configures the private registry, repository, version, and target
+platforms. The shared builder pushes both the versioned image and `latest`. It requires an
+authenticated Docker client and a Buildx builder that supports the listed platforms. The GitHub
+Actions release workflow remains separate and publishes its versioned images to GHCR.
 
 Create the UniFi API key secret before deploying:
 

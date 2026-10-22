@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Constructor Fleet">
+  <path d="M128 8 248 49v81c0 44-45 83-120 118C53 213 8 174 8 130V49L128 8Z" fill="#000" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M128 16 240 54v76c0 40-42 76-112 109C58 206 16 170 16 130V54l112-38Z" fill="#000" stroke="#ffdf00" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M112 65H83L63 80v57l20 16h29v-23H91l-5-5V99l5-5h21V65Z" fill="#ffdf00"/>
+  <path d="M137 65h59v24h-34v10h30v24h-30v31h-25V65Z" fill="#ffdf00"/>
+</svg>

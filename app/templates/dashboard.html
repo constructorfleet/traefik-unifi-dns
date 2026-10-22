@@ -3,52 +3,60 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>UniFi DNS Traefik</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Constructor Fleet | UniFi DNS</title>
   <style>
     :root{
       color-scheme:light;
-      --bg:#f6f8fb;
-      --panel:#ffffff;
-      --text:#182230;
-      --muted:#667085;
-      --line:#d9e1ec;
-      --accent:#0f766e;
-      --accent-soft:#e6f4f1;
+      --bg:#fbfbfc;
+      --panel:rgba(255,255,255,.78);
+      --text:#13161a;
+      --body:#3f3f3f;
+      --muted:#6b6c6c;
+      --line:#e3e6ea;
+      --accent:#08374a;
+      --accent-hover:#3f3f3f;
+      --active:#2a8da9;
+      --focus:#0e6a8f;
+      --accent-soft:#e4f1f4;
       --warn:#b42318;
       --warn-soft:#fff1f0;
-      --table-head:#eef3f8;
-      --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 24px rgba(16,24,40,.08);
+      --table-head:#f4f7f8;
+      --shadow:0 1px 2px rgba(19,22,26,.04),0 10px 24px rgba(19,22,26,.06);
     }
     [data-theme="dark"]{
       color-scheme:dark;
-      --bg:#0f1419;
-      --panel:#151b22;
-      --text:#e5edf5;
-      --muted:#94a3b8;
-      --line:#2d3745;
-      --accent:#2dd4bf;
-      --accent-soft:#12332f;
+      --bg:#111a1e;
+      --panel:rgba(22,34,39,.88);
+      --text:#edf4f5;
+      --body:#d7e2e4;
+      --muted:#a5b5b8;
+      --line:#304247;
+      --accent:#2a8da9;
+      --accent-hover:#57a9bf;
+      --active:#57a9bf;
+      --focus:#67bfd5;
+      --accent-soft:#1b3941;
       --warn:#fb7185;
       --warn-soft:#3b1720;
-      --table-head:#1d2630;
-      --shadow:0 1px 2px rgba(0,0,0,.32),0 10px 24px rgba(0,0,0,.28);
+      --table-head:#1d2c31;
+      --shadow:0 1px 2px rgba(0,0,0,.24),0 10px 24px rgba(0,0,0,.2);
     }
     *{box-sizing:border-box}
     body{
       margin:0;
-      background:var(--bg);
+      background:radial-gradient(ellipse at 8% 0%,#2a8da91c,transparent 35rem),var(--bg);
       color:var(--text);
-      font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      font:14px/1.5 "Avenir Next",Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     }
     header{
       position:sticky;
       top:0;
       z-index:2;
       border-bottom:1px solid var(--line);
-      background:rgba(246,248,251,.94);
-      backdrop-filter:blur(12px);
+      background:color-mix(in srgb,var(--bg) 88%,transparent);
+      backdrop-filter:blur(14px);
     }
-    [data-theme="dark"] header{background:rgba(15,20,25,.94)}
     .shell{max-width:1180px;margin:0 auto;padding:20px}
     .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
     .header-main{display:grid;gap:10px;min-width:0}
@@ -56,7 +64,9 @@
     .meta-item{display:flex;align-items:center;gap:6px;min-width:0}
     .meta-label{font-weight:700;color:var(--text)}
     .meta-value{overflow-wrap:anywhere}
-    h1{margin:0;font-size:22px;font-weight:700;letter-spacing:0}
+    .brand{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+    .brand-mark{display:block;width:30px;height:30px;flex:0 0 30px}
+    h1{margin:0;color:var(--accent);font-size:24px;font-weight:650;letter-spacing:-.025em}
     h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:0}
     .subtitle{margin:4px 0 0;color:var(--muted)}
     .status{display:flex;align-items:center;gap:8px;color:var(--muted);white-space:nowrap}
@@ -69,8 +79,9 @@
     .card,.panel{
       background:var(--panel);
       border:1px solid var(--line);
-      border-radius:8px;
+      border-radius:12px;
       box-shadow:var(--shadow);
+      backdrop-filter:blur(14px);
     }
     .card{padding:16px}
     .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
@@ -111,8 +122,10 @@
       font:inherit;
       padding:7px 10px;
     }
-    button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-    button:hover{filter:brightness(.96)}
+    button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;transition:background-color 150ms ease,border-color 150ms ease,box-shadow 150ms ease,transform 150ms ease}
+    button:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+    button:active{transform:translateY(1px)}
+    :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     button.danger{background:var(--warn);border-color:var(--warn)}
     button.secondary{background:var(--panel);border-color:var(--line);color:var(--text)}
     .icon-button{display:inline-flex;align-items:center;justify-content:center;width:32px;min-height:30px;padding:5px}
@@ -130,6 +143,7 @@
     code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
     .empty{padding:22px 16px;color:var(--muted)}
     .error-text{color:var(--warn)}
+    @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important}}
     @media (max-width:760px){
       .shell{padding:14px}
       .topbar{align-items:flex-start;flex-direction:column}
@@ -146,7 +160,8 @@
     <div class="shell topbar">
       <div class="header-main">
         <div>
-          <h1>UniFi DNS Traefik</h1>
+          <div class="brand"><img class="brand-mark" src="/favicon.svg" alt=""><span>Constructor Fleet</span></div>
+          <h1>UniFi DNS</h1>
           <p class="subtitle">Live reconciliation state from Docker service labels and UniFi static DNS.</p>
         </div>
         <div class="header-meta" aria-label="Controller status">
@@ -569,7 +584,7 @@
       tab.addEventListener("click", () => showPanel(tab.dataset.tab));
     });
 
-    applyTheme(localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+    applyTheme(localStorage.getItem("theme") || "light");
     connectEvents();
   </script>
 </body>

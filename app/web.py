@@ -2,6 +2,7 @@
 
 import json
 import time
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
@@ -33,6 +34,9 @@ class DashboardHttpServer(ThreadingHTTPServer):
 class DashboardRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/favicon.svg":
+            self._send_favicon()
+            return
         if self.path == "/healthz":
             self._send_json(200, {"ok": True})
             return
@@ -218,6 +222,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(html.encode())
+
+    def _send_favicon(self) -> None:
+        data = (Path(__file__).parent / "static" / "favicon.svg").read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/svg+xml")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(data)
 
     def _login(self) -> None:
         authenticator = self._dashboard_server.authenticator
