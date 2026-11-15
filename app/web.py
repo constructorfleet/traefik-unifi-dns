@@ -37,6 +37,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if parsed.path == "/favicon.svg":
             self._send_favicon()
             return
+        if parsed.path == "/constructorfleet-header-stacked.png":
+            self._send_brand_logo()
+            return
         if self.path == "/healthz":
             self._send_json(200, {"ok": True})
             return
@@ -227,6 +230,17 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         data = (Path(__file__).parent / "static" / "favicon.svg").read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "image/svg+xml")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_brand_logo(self) -> None:
+        data = (
+            Path(__file__).parent / "static" / "constructorfleet-header-stacked.png"
+        ).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "public, max-age=86400")
         self.end_headers()

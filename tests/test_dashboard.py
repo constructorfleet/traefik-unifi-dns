@@ -33,6 +33,8 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("--table-head:#292a2f", html)
         self.assertIn("--accent:#ffc400", html)
         self.assertIn("--active:#ef6538", html)
+        self.assertIn('src="/constructorfleet-header-stacked.png"', html)
+        self.assertNotIn("<span>Constructor Fleet</span>", html)
         self.assertIn("Controller status", html)
         self.assertIn('state.dry_run ? "Dry run" : "Live mode"', html)
         self.assertNotIn("<h2>Status</h2>", html)

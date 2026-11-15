@@ -15,6 +15,12 @@ class WebEndpointTests(unittest.TestCase):
         try:
             self.assertResponse(server, "/healthz", 200, b'{"ok": true}')
             self.assertResponse(server, "/readyz", 200, b'{"ready": true}')
+            self.assertResponse(
+                server,
+                "/constructorfleet-header-stacked.png",
+                200,
+                b"\x89PNG\r\n\x1a\n",
+            )
             self.assertResponse(server, "/", 200, b"new EventSource")
             self.assertResponse(server, "/api/state", 200, b'"owned_records"')
             self.assertResponse(server, "/api/state", 200, b"app.home.prettybaked.com")
